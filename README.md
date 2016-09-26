@@ -10,8 +10,8 @@
 ### Get the code
 
 ```
-$ git clone https://github.com/otothea/twitchbot.git
-$ cd twitchbot
+$ git clone https://github.com/otothea/node-twitchbot.git
+$ cd node-twitchbot
 $ npm install
 ```
 
