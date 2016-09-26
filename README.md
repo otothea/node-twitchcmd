@@ -29,6 +29,7 @@ $ cp config.example.js config.js
 - **commands** {object} [required] - [Command Map](#command-map)
 - **joinMessage** {string} - The message your bot posts to chat when it joins the channel (default: no message)
 - **announceUsers** {boolean} - Set to `true` to announce when users join and leave the chat (default: `false`)
+- **debug** {boolean} - Set to `true` to turn on debug for the irc client (default: `false`)
 
 ### Command Map
 
