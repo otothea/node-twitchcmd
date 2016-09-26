@@ -7,7 +7,7 @@
 - npm
 - some javascript knowledge
 
-### Get the code
+### Get the Code
 
 ```
 $ git clone https://github.com/otothea/node-twitchbot.git
@@ -15,7 +15,7 @@ $ cd node-twitchbot
 $ npm install
 ```
 
-### Create a config file
+### Create a Config File
 
 ```
 $ cp config.example.js config.js
@@ -26,11 +26,11 @@ $ cp config.example.js config.js
 - **name** {string} [required] - Your twitch bot username ([create a twitch account here](https://twitch.tv/signup))
 - **password** {string} [required] - Your *oauth* password ([get your oauth password here](https://twitchapps/tmi))
 - **channel** {string} [required] - Your twitch channel name (must include the #)
-- **commands** {object} [required] - [Command map](#command-map)
+- **commands** {object} [required] - [Command Map](#command-map)
 - **joinMessage** {string} - The message your bot posts to chat when it joins the channel (default: no message)
 - **announceUsers** {boolean} - Set to `true` to announce when users join and leave the chat (default: `false`)
 
-### Command map
+### Command Map
 
 Map commands to your bot using the `commands` option in your config.js. Commands can map to a string or a function and are prefixed with a `!` in twitch chat.
 
@@ -49,7 +49,7 @@ Map commands to your bot using the `commands` option in your config.js. Commands
 @OtotheBot: It works!
 ```
 
-##### If mapped to a function, your bot will role a random number between 0 and 100 and call your function with that roll.
+##### If mapped to a function, your bot will role a random number between 0 and 100 and call your function with that roll as the first argument.
 
 This command map simulates a Rock, Paper, Scissors game response from your bot:
 
@@ -89,4 +89,10 @@ This command map simulates a Rock, Paper, Scissors game response from your bot:
 @OtotheBot: Rock, it's a tie
 @OtotheA !rock
 @OtotheBot: Paper, you lose!
+```
+
+### Run it
+
+```
+$ npm start
 ```

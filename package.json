@@ -4,12 +4,13 @@
   "description": "Open source Twitch bot for creating custom commands for your twitch channel using javascript",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": "https://github.com/otothea/node-twitchbot.git",
-  "author": "",
+  "author": "O to the A <oscar@otothea.com>",
   "license": "ISC",
   "dependencies": {
-    "irc": "git+https://github.com/martynsmith/node-irc.git"
+    "irc": "0.5.0"
   }
 }
