@@ -1,0 +1,14 @@
+{
+  "name": "twitchbot",
+  "version": "0.0.1",
+  "description": "Open source Twitch bot for creating custom commands for your twitch channel using javascript",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "irc": "git+https://github.com/martynsmith/node-irc.git"
+  }
+}
