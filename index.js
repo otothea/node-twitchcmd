@@ -93,7 +93,7 @@ client.addListener('join' + config.channel, function(name) {
 });
 
 client.addListener('part' + config.channel, function(name) {
-    console.log('part:', nick);
+    console.log('part:', name);
 
     if (config.announceUsers && name.toLowerCase() !== config.name.toLowerCase())
         say(name + ' left');
@@ -136,3 +136,10 @@ function rollDice(min, max) {
 function say(message) {
     client.say(config.channel, message);
 }
+
+// Export stuff
+
+module.exports = {
+    client: client,
+    say:    say
+};

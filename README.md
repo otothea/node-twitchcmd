@@ -15,6 +15,8 @@ $ cd node-twitchbot
 $ npm install
 ```
 
+**NOTE:** npm may throw up an error saying `fatal error: 'unicode/ucsdet.h' file not found` but it is a non-issue for this app
+
 ### Create a Config File
 
 ```
