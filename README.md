@@ -1,17 +1,19 @@
-# Twitch Bot
+# Twitch Command
+
+Twitch Command is a simple [node-irc](https://github.com/martynsmith/node-irc) client. The purpose of this app is to allow users to easily create custom commands for their twitch channel.
 
 ### Prerequisites
 
 - git
 - node
 - npm
-- some javascript knowledge
+- Twitch account for your bot [create a twitch account here](https://twitch.tv/signup)
 
 ### Get the Code
 
 ```
-$ git clone https://github.com/otothea/node-twitchbot.git
-$ cd node-twitchbot
+$ git clone https://github.com/otothea/node-twitchcmd.git
+$ cd node-twitchcmd
 $ npm install
 ```
 
@@ -26,7 +28,7 @@ $ cp config.example.js config.js
 ##### Available config options
 
 - **name** {string} [required] - Your twitch bot username ([create a twitch account here](https://twitch.tv/signup))
-- **password** {string} [required] - Your *oauth* password ([get your oauth password here](https://twitchapps/tmi))
+- **password** {string} [required] - Your twitch bot *oauth* password (**NOT** your account password, [get your *oauth* password by clicking here](https://twitchapps/tmi))
 - **channel** {string} [required] - Your twitch channel name (must include the #)
 - **commands** {object} [required] - [Command Map](#command-map)
 - **joinMessage** {string} - The message your bot posts to chat when it joins the channel (default: no message)
@@ -37,7 +39,7 @@ $ cp config.example.js config.js
 
 Map commands to your bot using the `commands` option in your config.js. Commands can map to a string or a function and are prefixed with a `!` in twitch chat.
 
-##### If mapped to a string, your bot will respond to the command with that string as a message
+##### If mapped to a string, your bot will respond to the command in chat with that string as a message
 
 ```
 {
@@ -52,9 +54,9 @@ Map commands to your bot using the `commands` option in your config.js. Commands
 @OtotheBot: It works!
 ```
 
-##### If mapped to a function, your bot will role a random number between 0 and 100 and call your function with that roll as the first argument.
+##### If mapped to a function, your bot will role a random number between 0 and 100 and call your function with that roll as the first argument. The returned text will be sent to the Twitch chat. If you return nothing, your bot will not post in the chat.
 
-This command map simulates a Rock, Paper, Scissors game response from your bot:
+This command map simulates a Rock, Paper, Scissors game and sends a response from your bot:
 
 ```
 {
@@ -99,3 +101,5 @@ This command map simulates a Rock, Paper, Scissors game response from your bot:
 ```
 $ npm start
 ```
+
+**IMPORTANT:** Don't forget to set your bot as a moderator in your channel

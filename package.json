@@ -1,5 +1,5 @@
 {
-  "name": "twitchbot",
+  "name": "twitchcmd",
   "version": "0.0.1",
   "description": "Open source Twitch bot for mapping custom commands to your twitch channel using javascript",
   "main": "index.js",
@@ -7,7 +7,7 @@
     "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "repository": "https://github.com/otothea/node-twitchbot.git",
+  "repository": "https://github.com/otothea/node-twitchcmd.git",
   "author": "O to the A <oscar@otothea.com>",
   "license": "MIT",
   "dependencies": {
