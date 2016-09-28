@@ -1,48 +1,60 @@
 # Twitch Command
 
-Twitch Command is a simple <a href="https://github.com/martynsmith/node-irc" target="_blank">node-irc</a> client. The purpose of this app is to allow users to easily create custom commands for their Twitch channel.
+Twitch Command is a simple [node-irc](https://github.com/martynsmith/node-irc) client. The purpose of this app is to allow users to easily create custom commands for their Twitch channel.
+
+**IMPORTANT:** Don't forget to set your bot as a moderator in your channel
 
 ### Prerequisites
 
-- git
-- node
 - npm
-- Twitch account for your bot <a href="https://twitch.tv/signup" target="_blank">create a twitch account here</a>
+- [Create a twitch account for your bot](https://twitch.tv/signup)
 
-### Get the Code
+### Install
 
 ```
-$ git clone https://github.com/otothea/node-twitchcmd.git
-$ cd node-twitchcmd
-$ npm install
+$ npm install --save twitchcmd
 ```
 
 **NOTE:** npm may throw up an error saying `fatal error: 'unicode/ucsdet.h' file not found` but it is a non-issue for this app
 
-### Create a Config File
+### Usage
 
 ```
-$ cp config.example.js config.js
+var twitchcmd = require('twitchcmd');
+
+var config = {
+    name: 'MuhBot',
+    password: 'oauth:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    channel: '#muhname',
+    joinMessage: 'Hello world!',
+    announdUsers: true,
+    debug: false,
+    commands: {
+        test: 'It works!'
+    }
+}
+ 
+twitchcmd.init(config);
 ```
 
 ##### Available config options
 
-- **name** {string} [required] - Your twitch bot username (<a href="https://twitch.tv/signup" target="_blank">create a twitch account here</a>)
-- **password** {string} [required] - Your twitch bot *oauth* password (**NOT** your account password, <a href="https://twitchapps.com/tmi/" target="_blank">get your *oauth* password by clicking here</a>)
-- **channel** {string} [required] - Your twitch channel name (must include the #)
+- **name** {string} [required] - Your Twitch bot username
+- **password** {string} [required] - Your Twitch bot *oauth* password (**NOT** the Twitch password, [get your *oauth* password here](https://twitchapps.com/tmi/))
+- **channel** {string} [required] - Your Twitch channel name (must include the `#`)
 - **commands** {object} [required] - [Command Map](#command-map)
 - **joinMessage** {string} - The message your bot posts to chat when it joins the channel (default: no message)
 - **announceUsers** {boolean} - Set to `true` to announce when users join and leave the chat (default: `false`)
-- **debug** {boolean} - Set to `true` to turn on debug for the irc client (default: `false`)
+- **debug** {boolean} - Set to `true` to turn on debug logging (default: `false`)
 
 ### Command Map
 
-Map commands to your bot using the `commands` option in your config.js. Commands can map to a string or a function and are prefixed with a `!` in twitch chat.
+Map commands to your bot using the `commands` option in your `config`. Commands can map to a `string` or a `function` and are prefixed with a `!` in Twitch chat.
 
-##### If mapped to a string, your bot will respond to the command in chat with that string as a message
+##### If mapped to a string, your bot will respond to the command in chat with that string as a message and the command arguments are ignored
 
 ```
-{
+commands: {
     test: 'It works!'
 }
 ```
@@ -50,39 +62,33 @@ Map commands to your bot using the `commands` option in your config.js. Commands
 ##### Twitch chat usage
 
 ```
-@OtotheA: !test
-@OtotheBot: It works!
+@MuhName: !test all the things
+@MuhBot: It works!
 ```
 
-##### If mapped to a function, your bot will role a random number between 0 and 100 and call your function with that roll as the first argument. The returned text will be sent to the Twitch chat. If you return nothing, your bot will not post in the chat.
+##### If mapped to a function, your bot will call that function with the command arguments as an array. The text you return will be sent to the Twitch chat. If you return anything other than a `string`, your bot will not post in the chat. It also supports `Promise` _(see the example below)_.
 
-This command map simulates a Rock, Paper, Scissors game and sends a response from your bot:
+This command map has a command to fetch image urls from giphy and post them to chat using [request](https://github.com/request/request):
 
-```
-{
-    rock: function(roll) {
-        roll = Math.round(roll / 100 * 3);
-        roll = Math.max(roll - 1, 0);
- 
-        var outcomes = ['Paper, you lose!', 'Rock, it\'s a tie', 'Scissors, you win!'];
- 
-        return outcomes[roll];
-    },
-    paper: function(roll) {
-        roll = Math.round(roll / 100 * 3);
-        roll = Math.max(roll - 1, 0);
- 
-        var outcomes = ['Scissors, you lose!', 'Paper, it\'s a tie', 'Rock, you win!'];
- 
-        return outcomes[roll];
-    },
-    scissors: function(roll) {
-        roll = Math.round(roll / 100 * 3);
-        roll = Math.max(roll - 1, 0);
- 
-        var outcomes = ['Rock, you lose!', 'Scissors, it\'s a tie', 'Paper, you win!'];
- 
-        return outcomes[roll];
+``` 
+commands: {
+    giphy: function(args) {
+        var opts = {
+            json: true,
+            qs: {
+                q:       args.join(' '),
+                api_key: 'dc6zaTOxFJmzC'
+            }
+        };
+
+        return new Promise(function(resolve, reject) {
+            request.get('http://api.giphy.com/v1/gifs/search', opts, function(err, res) {
+                if (err)
+                    return reject(err);
+
+                resolve(res.body.data[0].images.original.url);
+            });
+        });
     }
 }
 ```
@@ -90,16 +96,6 @@ This command map simulates a Rock, Paper, Scissors game and sends a response fro
 ##### Twitch chat usage
 
 ```
-@OtotheA: !rock
-@OtotheBot: Rock, it's a tie
-@OtotheA !rock
-@OtotheBot: Paper, you lose!
+@MuhName: !giphy funky chicken
+@MuhBot: http://media4.giphy.com/media/3oGRFBMkvqEzGKtwcw/giphy.gif
 ```
-
-### Run it
-
-```
-$ npm start
-```
-
-**IMPORTANT:** Don't forget to set your bot as a moderator in your channel

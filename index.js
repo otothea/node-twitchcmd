@@ -10,31 +10,23 @@ var initialized = false;
 var config      = null;
 var client      = null;
 
-if (!module.parent) {
-    init();
-}
-else {
-    module.exports = {
-        init: init
-    };
-}
+module.exports = {
+    init: init
+};
 
 function init(_config) {
     if (initialized)
         return;
 
-    config = _config || require('./config');
-
-    validateConfig();
+    config = validateConfig(_config);
 
     client = new irc.Client(config.server, config.name.toLowerCase(), {
-        userName:   config.name,
-        realName:   config.name,
-        password:   config.password,
-        port:       config.port,
-        secure:     config.secure,
-        channels:   [config.channel],
-        debug:      config.debug
+        userName: config.name,
+        realName: config.name,
+        password: config.password,
+        port:     config.port,
+        secure:   config.secure,
+        channels: [config.channel]
     });
 
     client.addListener('error',                    onError);
@@ -49,30 +41,30 @@ function init(_config) {
 // Event Handlers
 
 function onError(message) {
-    console.error(chalk.red(message));
+    error(message);
 }
 
 function onRegistered() {
-    console.log('registered');
+    log('Bot is running...', true);
 
     if (config.joinMessage)
         say(config.joinMessage);
 }
 
 function onJoin(name) {
-    console.log('join:', name);
+    log('join: ' + name);
 
     announce(name, 'joined');
 }
 
 function onPart(name) {
-    console.log('part:', name);
+    log('part: ' + name);
 
     announce(name, 'left');
 }
 
 function onMessage(from, message) {
-    console.log('message:', from, '=>', message);
+    log('message: ' + from + ' => ' + message);
 
     if (message.indexOf('!') !== 0)
         return;
@@ -88,24 +80,34 @@ function onMessage(from, message) {
         var handler = config.commands[command];
 
         if (typeof handler === 'function') {
-            var response = handler(rollDice(), args);
-            if (response)
-                say(response);
+            var response = Promise.resolve(handler(args));
+            response.then(function(response) {
+                if (typeof response === 'string')
+                    say(response);
+            });
         }
         else if (typeof handler === 'string')
             say(handler);
+    }
+    else if (command === 'cmd') {
+        var commands = Object.keys(config.commands);
+
+        if (commands.length)
+            say('Available Commands: !' + Object.keys(config.commands).join(', !'));
+        else
+            say('No commands available');
     }
 }
 
 // Helper functions
 
-function validateConfig() {
+function validateConfig(_config) {
     var schema = joi.object().keys({
         name:          joi.string().required(),
         password:      joi.string().required(),
         channel:       joi.string().regex(/^#/).required(),
         commands:      joi.object().required(),
-        joinMessage:   joi.string().default(false),
+        joinMessage:   joi.alternatives().try(joi.string(), joi.boolean()).default(false),
         announceUsers: joi.boolean().default(false),
         debug:         joi.boolean().default(false),
         server:        joi.string().default('irc.chat.twitch.tv').uri(),
@@ -113,31 +115,17 @@ function validateConfig() {
         secure:        joi.boolean().default(true)
     });
 
-    var validation = joi.validate(config, schema);
+    var validation = joi.validate(_config, schema);
 
     if (validation.error) {
-
-        var error = chalk.red('Your Twitch Command configuration is invalid.\n') +
+        var error = 'Your twitchcmd configuration is invalid.\n' +
             'Please consult the README.md for more information.\n' +
             validation.error.message;
 
-        if (!module.parent) {
-            console.error('Error:', error);
-            process.exit(1);
-        }
-        else {
-            throw new Error(error);
-        }
+        throw new Error(error);
     }
 
-    config = validation.value;
-}
-
-function rollDice(min, max) {
-    min = min || 0;
-    max = max || 100;
-
-    return Math.floor(Math.random() * (max - min + 1) + min);
+    return validation.value;
 }
 
 function announce(name, action) {
@@ -147,4 +135,14 @@ function announce(name, action) {
 
 function say(message) {
     client.say(config.channel, message);
+}
+
+function log(message, force) {
+    if (config.debug || force)
+        console.log(message);
+}
+
+function error(message) {
+    if (config.debug || force)
+        console.error(chalk.red(message));
 }
