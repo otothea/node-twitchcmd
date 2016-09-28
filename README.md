@@ -1,3 +1,7 @@
+[![npm](https://nodei.co/npm/twitchcmd.png)](https://npmjs.org/package/twitchcmd)
+[![MIT License](https://img.shields.io/github/license/otothea/node-twitchcmd.svg)](https://github.com/otothea/node-twitchcmd/blob/master/LICENSE)
+[![Dependency Status](https://david-dm.org/otothea/node-twitchcmd.svg)](https://david-dm.org/otothea/node-twitchcmd)
+
 # Twitch Command
 
 Twitch Command is a simple [node-irc](https://github.com/martynsmith/node-irc) client. The purpose of this app is to allow users to easily create custom commands for their Twitch channel.
