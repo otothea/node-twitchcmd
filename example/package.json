@@ -1,0 +1,16 @@
+{
+  "name": "twitch-otothebot",
+  "version": "0.0.1",
+  "description": "Example of how to use Twitch Command",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "O to the A <oscar@otothea.com>",
+  "license": "MIT",
+  "dependencies": {
+    "request": "2.75.0",
+    "twitchcmd": "0.0.1"
+  }
+}
