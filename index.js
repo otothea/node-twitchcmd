@@ -1,130 +1,137 @@
 // Require dependencies
 
-var config = require('./config');
-var irc    = require('irc');
+var joi   = require('joi');
+var chalk = require('chalk');
+var irc   = require('irc');
 
-// Check config for required options
+// Set up app
 
-if (!config)
-    throw new Error('config is required');
+var initialized = false;
+var config      = null;
+var client      = null;
 
-if (config && typeof config !== 'object')
-    throw new Error('config must be an object');
+if (!module.parent) {
+    init();
+}
+else {
+    module.exports = {
+        init: init
+    };
+}
 
-if (!config.name)
-    throw new Error('config.name is required');
+function init(_config) {
+    if (initialized)
+        return;
 
-if (typeof config.name !== 'string')
-    throw new Error('config.name must be a string');
+    config = _config || require('./config');
 
-if (!config.password)
-    throw new Error('config.password is required');
+    validateConfig();
 
-if (typeof config.password !== 'string')
-    throw new Error('config.password must be a string');
+    client = new irc.Client(config.server, config.name.toLowerCase(), {
+        userName:   config.name,
+        realName:   config.name,
+        password:   config.password,
+        port:       config.port,
+        secure:     config.secure,
+        channels:   [config.channel],
+        debug:      config.debug
+    });
 
-if (!config.channel)
-    throw new Error('config.channel is required');
+    client.addListener('error',                    onError);
+    client.addListener('registered',               onRegistered);
+    client.addListener('join' + config.channel,    onJoin);
+    client.addListener('part' + config.channel,    onPart);
+    client.addListener('message' + config.channel, onMessage);
 
-if (typeof config.channel !== 'string' || config.channel.charAt(0) !== '#')
-    throw new Error('config.channel must be a string starting with \'#\'');
+    initialized = true;
+}
 
-// Check config for optional options
+// Event Handlers
 
-if (config.joinMessage && typeof config.joinMessage !== 'string')
-    throw new Error('config.joinMessage must be a string');
+function onError(message) {
+    console.error(chalk.red(message));
+}
 
-if (config.announceUsers && typeof config.announceUsers !== 'boolean')
-    throw new Error('config.announceUsers must be a boolean');
-
-if (config.commands && typeof config.commands !== 'object')
-    throw new Error('config.commands must be an object');
-
-if (config.debug && typeof config.debug !== 'boolean')
-    throw new Error('config.debug must be an boolean');
-
-if (config.server && typeof config.server !== 'string')
-    throw new Error('config.server must be an string');
-
-if (config.port && typeof config.port !== 'number')
-    throw new Error('config.port must be an number');
-
-if (config.secure && typeof config.secure !== 'boolean')
-    throw new Error('config.secure must be an boolean');
-
-// Set defaults for optional config options
-
-config.announceUsers = config.announceUsers || false;
-config.joinMessage   = config.joinMessage   || false;
-config.commands      = config.commands      || {};
-config.debug         = config.debug         || false;
-config.server        = config.server        || 'irc.chat.twitch.tv';
-config.port          = config.port          || 443;
-config.secure        = !config.secure       || true;
-
-// Set up the irc client
-
-var client = new irc.Client(config.server, config.name.toLowerCase(), {
-    userName:   config.name,
-    realName:   config.name,
-    password:   config.password,
-    port:       config.port,
-    secure:     config.secure,
-    channels:   [config.channel],
-    debug:      config.debug
-});
-
-client.addListener('error', function(message) {
-    console.log('error: ', message);
-});
-
-client.addListener('registered', function() {
+function onRegistered() {
     console.log('registered');
 
     if (config.joinMessage)
         say(config.joinMessage);
-});
+}
 
-client.addListener('join' + config.channel, function(name) {
+function onJoin(name) {
     console.log('join:', name);
 
-    if (config.announceUsers && name.toLowerCase() !== config.name.toLowerCase())
-        say(name + ' joined');
-});
+    announce(name, 'joined');
+}
 
-client.addListener('part' + config.channel, function(name) {
+function onPart(name) {
     console.log('part:', name);
 
-    if (config.announceUsers && name.toLowerCase() !== config.name.toLowerCase())
-        say(name + ' left');
-});
+    announce(name, 'left');
+}
 
-client.addListener('message' + config.channel, function(from, message) {
+function onMessage(from, message) {
     console.log('message:', from, '=>', message);
 
-    if (message.indexOf('!') === 0) {
-        message = message.substr(1).toLowerCase();
+    if (message.indexOf('!') !== 0)
+        return;
 
-        var parts = message.split(' ');
+    message = message.substr(1).toLowerCase();
 
-        var command = parts[0];
-        var args    = parts.slice(1);
+    var parts = message.split(' ');
 
-        if (command in config.commands) {
-            var handler = config.commands[command];
+    var command = parts[0];
+    var args    = parts.slice(1);
 
-            if (typeof handler === 'function') {
-                var message = handler(rollDice(), args);
-                if (message)
-                    say(message);
-            }
-            else if (typeof handler === 'string')
-                say(handler);
+    if (command in config.commands) {
+        var handler = config.commands[command];
+
+        if (typeof handler === 'function') {
+            var response = handler(rollDice(), args);
+            if (response)
+                say(response);
         }
+        else if (typeof handler === 'string')
+            say(handler);
     }
-});
+}
 
 // Helper functions
+
+function validateConfig() {
+    var schema = joi.object().keys({
+        name:          joi.string().required(),
+        password:      joi.string().required(),
+        channel:       joi.string().regex(/^#/).required(),
+        commands:      joi.object().required(),
+        joinMessage:   joi.string().default(false),
+        announceUsers: joi.boolean().default(false),
+        debug:         joi.boolean().default(false),
+        server:        joi.string().default('irc.chat.twitch.tv').uri(),
+        port:          joi.number().default(443).integer().positive(),
+        secure:        joi.boolean().default(true)
+    });
+
+    var validation = joi.validate(config, schema);
+
+    if (validation.error) {
+
+        var error = chalk.red('Your Twitch Command configuration is invalid.\n') +
+            'Please consult the README.md for more information.\n' +
+            validation.error.message;
+
+        if (!module.parent) {
+            console.error('Error:', error);
+            process.exit(1);
+        }
+        else {
+            throw new Error(error);
+        }
+    }
+
+    config = validation.value;
+}
 
 function rollDice(min, max) {
     min = min || 0;
@@ -133,13 +140,11 @@ function rollDice(min, max) {
     return Math.floor(Math.random() * (max - min + 1) + min);
 }
 
+function announce(name, action) {
+    if (config.announceUsers && name.toLowerCase() !== config.name.toLowerCase())
+        say(name + ' ' + action);
+}
+
 function say(message) {
     client.say(config.channel, message);
 }
-
-// Export stuff
-
-module.exports = {
-    client: client,
-    say:    say
-};
