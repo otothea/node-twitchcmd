@@ -9,7 +9,8 @@
     "bot",
     "command",
     "cmd",
-    "twitchcmd"
+    "twitchcmd",
+    "custom"
   ],
   "repository": {
     "type": "git",
