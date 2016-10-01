@@ -5,7 +5,7 @@ var config = {
     name:        'examplebot',
     password:    'oauth:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
     channel:     '#example',
-    joinMessage: false,
+    joinMessage: 'hi',
     debug:       true,
     commands: {
         giphy: onGiphy
@@ -16,7 +16,9 @@ twitchcmd.init(config);
 
 // Handlers
 
-function onGiphy(args) {
+function onGiphy(args, mod) {
+    if (!mod) return; // restrict this command to moderators only
+
     var opts = {
         json: true,
         qs: {
@@ -28,9 +30,11 @@ function onGiphy(args) {
     return new Promise(function(resolve, reject) {
         request.get('http://api.giphy.com/v1/gifs/search', opts, function(err, res) {
             if (err)
-                return reject(err);
-
-            resolve(res.body.data[0].images.original.url);
+                reject(err);
+            else if (res.body.data && res.body.data.length)
+                resolve(res.body.data[0].images.original.url);
+            else
+                resolve();
         });
-    });
+    }).catch(console.error);
 }
