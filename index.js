@@ -22,6 +22,7 @@ function init(_config) {
 
     config = helpers.validateConfig(_config);
 
+    // Init the client
     client = new irc.Client(config.server, config.name, {
         userName: config.name,
         realName: config.name,
@@ -30,6 +31,7 @@ function init(_config) {
         secure:   config.secure,
     });
 
+    // Add listeners
     client.addListener('error',                    onError);
     client.addListener('registered',               onRegistered);
     client.addListener('join' + config.channel,    onJoin);
@@ -38,6 +40,11 @@ function init(_config) {
     client.addListener('notice',                   onNotice);
     client.addListener('message' + config.channel, onMessage);
     client.addListener('raw',                      onRaw);
+
+    // Init the timers
+    config.timers.forEach(function(timer) {
+        helpers.createTimeout(timer, onTimer);
+    });
 
     initialized = true;
 }
@@ -54,6 +61,9 @@ function onRegistered() {
     // Send the Capabilities command
     // https://help.twitch.tv/customer/portal/articles/1302780-twitch-irc
     client.send('CAP', 'REQ', constants.TWTTCH_MEMBERSHIP);
+
+    // Join the channel
+    client.join(config.channel);
 }
 
 function onJoin(name) {
@@ -64,7 +74,7 @@ function onJoin(name) {
         say(config.joinMessage);
 
     // Index user with defaults
-    users[name] = { moderator: false };
+    users[name] = helpers.createUser();
 }
 
 function onPart(name) {
@@ -86,16 +96,8 @@ function onRaw(message) {
     if (!(message.command in constants.IGNORE_COMMANDS))
         log(message);
 
-    // Check for good Capabilities response
-    if (message.command === 'CAP' &&
-        message.args[1] === 'ACK' &&
-        message.args[2] === constants.TWTTCH_MEMBERSHIP)
-    {
-        // Join the channel
-        client.join(config.channel);
-    }
     // If MODE command, trigger mode event
-    else if (message.command === 'MODE')
+    if (message.command === 'MODE')
         onMode(message.args[0], message.nick, message.args[1], message.args[2]);
 }
 
@@ -116,13 +118,13 @@ function onMessage(from, message) {
 
     // If it's a valid command
     if (command in config.commands) {
-        var handler   = config.commands[command];
-        var moderator = users[from] && users[from].moderator;
+        var handler  = config.commands[command];
+        var mod      = users[from] && users[from].mod;
 
         // If function, run it
         if (typeof handler === 'function') {
             // Call the handler and convert to promise
-            var response = handler(args, moderator);
+            var response = handler(args, mod);
             response = Promise.resolve(response);
             response.then(say);
         }
@@ -145,12 +147,36 @@ function onMode(channel, by, mode, argument, message) {
     // If it's for this channel and sent from Twitch
     if (channel === config.channel && by === constants.TWITCH_NAME) {
         // Add mod
-        if (mode === constants.MODES.ADD_MOD && users[argument])
-            users[argument].moderator = true;
+        if (mode === constants.MODES.ADD_MOD) {
+            users[argument] = users[argument] || helpers.createUser();
+            users[argument].mod = true;
+        }
         // Subtract mod
-        else if (mode === constants.MODES.SUB_MOD && users[argument])
-            users[argument].moderator = false;
+        else if (mode === constants.MODES.SUB_MOD) {
+            users[argument] = users[argument] || helpers.createUser();
+        }
     }
+}
+
+function onTimer(timer) {
+    // If function, run it
+    if (typeof timer.handler === 'function') {
+        // Call the handler and convert to promise
+        var response = timer.handler();
+        response = Promise.resolve(response);
+        response.then(function(message) {
+            say(message);
+
+            helpers.createTimeout(timer, onTimer);
+        });
+
+        return;
+    }
+    // If string, just say it
+    else if (typeof timer.handler === 'string')
+        say(timer.handler);
+
+    helpers.createTimeout(timer, onTimer);
 }
 
 // Helper functions

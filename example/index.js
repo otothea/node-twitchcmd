@@ -1,22 +1,32 @@
 var request   = require('request');
 var twitchcmd = require('twitchcmd');
 
+var commands = {
+    giphy: giphy
+};
+
+var timers = [{
+    seconds: 10,
+    handler: function() {
+        return giphy(['test']);
+    }
+}];
+
 var config = {
     name:        'examplebot',
     password:    'oauth:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
     channel:     '#example',
     joinMessage: 'hi',
     debug:       true,
-    commands: {
-        giphy: onGiphy
-    }
+    commands:    commands,
+    timers:      timers
 };
 
 twitchcmd.init(config);
 
 // Handlers
 
-function onGiphy(args, mod) {
+function giphy(args, mod) {
     if (!mod) return; // restrict this command to moderators only
 
     var opts = {
