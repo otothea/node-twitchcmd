@@ -11,6 +11,6 @@
   "license": "MIT",
   "dependencies": {
     "request": "2.75.0",
-    "twitchcmd": "0.0.2"
+    "twitchcmd": "0.0.3"
   }
 }

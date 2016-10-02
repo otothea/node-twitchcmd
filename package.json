@@ -1,6 +1,6 @@
 {
   "name": "twitchcmd",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Open source Twitch bot for mapping custom commands to your twitch channel using javascript",
   "author": "Oscar Armstrong <oscar@otothea.com> (https://github.com/otothea)",
   "homepage": "https://otothea.com",
