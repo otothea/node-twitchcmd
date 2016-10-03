@@ -17,12 +17,17 @@ var config = {
     password:    'oauth:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
     channel:     '#example',
     joinMessage: 'hi',
+    partMessage: 'bye',
     debug:       true,
     commands:    commands,
     timers:      timers
 };
 
 twitchcmd.init(config);
+
+process.on('SIGINT', () => {
+    twitchcmd.exit();
+});
 
 // Handlers
 

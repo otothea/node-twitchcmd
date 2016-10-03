@@ -6,14 +6,15 @@ var constants = require('./lib/constants');
 
 // Set up app
 
-var initialized = false; // Boolean
-var config      = null;  // Object
-var client      = null;  // irc.Client
-
-var users = {}; // index users in channel
+var initialized = false;
+var exited      = false;
+var config      = null;
+var client      = null;
+var users       = {};
 
 module.exports = {
-    init: init
+    init: init,
+    exit: exit
 };
 
 function init(_config) {
@@ -49,6 +50,17 @@ function init(_config) {
     initialized = true;
 }
 
+function exit() {
+    if (exited)
+        return;
+
+    log('Exiting...', true);
+
+    client.part(config.channel);
+
+    exited = true;
+}
+
 // Event Handlers
 
 function onError(message) {
@@ -56,7 +68,7 @@ function onError(message) {
 }
 
 function onRegistered() {
-    log('Running...', true);
+    log('Initialized...', true);
 
     // Send the Capabilities command
     // https://help.twitch.tv/customer/portal/articles/1302780-twitch-irc
@@ -79,6 +91,12 @@ function onJoin(name) {
 
 function onPart(name) {
     log('part: ' + name);
+
+    // Say the join message
+    if (name === config.name && exited) {
+        say(config.partMessage);
+        client.disconnect();
+    }
 
     // Remove user from index
     users[name] = undefined;
@@ -152,8 +170,8 @@ function onMode(channel, by, mode, argument, message) {
             users[argument].mod = true;
         }
         // Subtract mod
-        else if (mode === constants.MODES.SUB_MOD) {
-            users[argument] = users[argument] || helpers.createUser();
+        else if (mode === constants.MODES.SUB_MOD && users[argument]) {
+            users[argument].mod = false;
         }
     }
 }

@@ -42,6 +42,10 @@ var config = {
 }
  
 twitchcmd.init(config);
+ 
+process.on('SIGINT', () => {
+    twitchcmd.exit();
+});
 ```
 
 ##### Config options
@@ -52,6 +56,7 @@ twitchcmd.init(config);
 - **commands** {object} - [Command Map](#command-map)
 - **timers** {object[]} - [Timers](#timers)
 - **joinMessage** {string} - The message your bot posts to chat when it joins the channel (default: no message)
+- **partMessage** {string} - The message your bot posts to chat when it leaves the channel (default: no message)
 - **debug** {boolean} - Set to `true` to turn on debug logging (default: `false`)
 
 ### Command Map
