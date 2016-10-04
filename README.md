@@ -31,7 +31,7 @@ var config = {
     password: 'oauth:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
     channel: '#muhname',
     joinMessage: 'Hello world!',
-    debug: false,
+    partMessage: 'Goodbye world!',
     commands: {
         test: 'It works!'
     },
@@ -53,18 +53,18 @@ process.on('SIGINT', () => {
 - **name** {string} [required] - Your Twitch bot username
 - **password** {string} [required] - Your Twitch bot *oauth* password (**NOT** the Twitch password, [get your *oauth* password here](https://twitchapps.com/tmi/))
 - **channel** {string} [required] - Your Twitch channel name (must include the `#`)
-- **commands** {object} - [Command Map](#command-map)
-- **timers** {object[]} - [Timers](#timers)
+- **commandPrefix** {string} - The character commands start with (default: `!`)
+- **commands** {object} - See [Command Map](#command-map)
+- **timers** {object[]} - See [Timers](#timers)
 - **joinMessage** {string} - The message your bot posts to chat when it joins the channel (default: no message)
 - **partMessage** {string} - The message your bot posts to chat when it leaves the channel (default: no message)
+- **filterSpam** {boolean} - Set to `true` to enable spam filters (default: `false`) See [Spam Filters](#spam-filters)
+- **maxOffenses** {number} - Number of offenses before user is banned (default `3`) See [Spam Filters](#spam-filters)
 - **debug** {boolean} - Set to `true` to turn on debug logging (default: `false`)
 
 ### Command Map
 
-Map commands to your bot using the `commands` option in your `config`.
-Commands can map to a `string` or a `function` that returns a `string` or a `Promise` that resolves a `string`.
-
-Commands are prefixed with a `!` in Twitch chat.
+Map commands to your bot using the `commands` option in your `config`. Commands can map to a `string`, or a `function` that either returns a `string` or returns a `Promise` that resolves a `string`. If you do not want your bot to respond, don't return anything.
 
 ##### String example
 
@@ -92,7 +92,7 @@ If mapped to a function, the text you return or resolve will be sent to the Twit
 - **args** {string[]} - Array of arguments from the chat command
 - **mod** {boolean} - Whether or not the sender is a moderator
 
-This command map will respond to the command `!giphy` with an image url matching the input args using [request](https://github.com/request/request):
+This command map will respond to the command `!giphy` with an image that matches the input args using [request](https://github.com/request/request):
 
 ```
 commands: {
@@ -126,6 +126,15 @@ commands: {
 @MuhBot: http://media4.giphy.com/media/3oGRFBMkvqEzGKtwcw/giphy.gif
 ```
 
+##### Available commands
+
+Every bot supports the `!cmd` command which lists all of the available commands
+
+```
+@MuhName: !cmd
+@MuhBot: Available Commands: !test, !giphy
+```
+
 ### Timers
 
 Create messages that run on intervals using the `timers` option in your `config`.
@@ -143,3 +152,13 @@ timers: [{
     handler: 'Still here!'
 }]
 ```
+
+### Spam Filters
+
+- Excessive capital letters - triggered when 10 or more capital letters make up a majority of the message
+
+If a user triggers a spam filter, they will be timed out for 10 seconds for the first offense and 60 seconds for each offense after. If a user hits the `maxOffense` limit, they will be banned from the channel.
+
+**NOTE:** Moderators can unban users from the channel by typing `/unban <username>` in the twitch chat
+
+More filters to come, suggestions welcome

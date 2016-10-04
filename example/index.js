@@ -19,6 +19,7 @@ var config = {
     joinMessage: 'hi',
     partMessage: 'bye',
     debug:       true,
+    filterSpam:  true,
     commands:    commands,
     timers:      timers
 };
