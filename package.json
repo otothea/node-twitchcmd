@@ -2,8 +2,21 @@
   "name": "twitchcmd",
   "version": "0.0.6",
   "description": "Open source Twitch bot for mapping custom commands to your twitch channel using javascript",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "author": "Oscar Armstrong <oscar@otothea.com> (https://github.com/otothea)",
-  "homepage": "https://otothea.com",
+  "license": "MIT",
+  "dependencies": {
+    "irc": "0.5.0",
+    "joi": "9.0.4",
+    "request": "2.75.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/otothea/node-twitchcmd.git"
+  },
   "keywords": [
     "twitch",
     "bot",
@@ -12,21 +25,8 @@
     "twitchcmd",
     "custom"
   ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/otothea/node-twitchcmd"
-  },
-  "main": "index.js",
-  "dependencies": {
-    "irc": "0.5.0",
-    "joi": "9.0.4",
-    "request": "2.75.0"
-  },
   "bugs": {
     "url": "https://github.com/otothea/node-twitchcmd/issues"
   },
-  "license": "MIT",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  }
+  "homepage": "https://github.com/otothea/node-twitchcmd"
 }
