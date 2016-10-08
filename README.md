@@ -166,6 +166,11 @@ Ban a user in chat using
 twitchcmd.ban('username', 'reason for ban');
 ```
 
+Say something to chat using
+```
+twitchcmd.say('message for chat');
+```
+
 ### Spam Filters
 
 - Excessive capital letters - triggered when 10 or more capital letters make up a majority of the message
