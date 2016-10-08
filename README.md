@@ -1,5 +1,5 @@
 [![npm](https://img.shields.io/npm/v/twitchcmd.svg?style=flat)](https://www.npmjs.com/package/twitchcmd)
-[![MIT License](https://img.shields.io/github/license/otothea/node-twitchcmd.svg)](https://github.com/otothea/node-twitchcmd/blob/master/LICENSE)
+[![MIT License](https://img.shields.io/npm/l/twitchcmd.svg)](https://github.com/otothea/node-twitchcmd/blob/master/LICENSE)
 [![Dependency Status](https://david-dm.org/otothea/node-twitchcmd.svg)](https://david-dm.org/otothea/node-twitchcmd)
 
 # Twitch Command
