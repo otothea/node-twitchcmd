@@ -8,12 +8,11 @@ Twitch Command is a simple [node-irc](https://github.com/martynsmith/node-irc) c
 
 **IMPORTANT:** Don't forget to set your bot as a moderator in your channel
 
-### Prerequisites
+## Prerequisites
 
-- npm
 - [Create a twitch account for your bot](https://twitch.tv/signup)
 
-### Install
+## Install
 
 ```
 $ npm install --save twitchcmd
@@ -21,7 +20,7 @@ $ npm install --save twitchcmd
 
 **NOTE:** npm may throw up an error saying `fatal error: 'unicode/ucsdet.h' file not found` but it is a non-issue for this app
 
-### Usage
+## Usage
 
 ```
 var twitchcmd = require('twitchcmd');
@@ -48,7 +47,7 @@ process.on('SIGINT', () => {
 });
 ```
 
-##### Config options
+**Config options**
 
 - **name** {string} [required] - Your Twitch bot username
 - **password** {string} [required] - Your Twitch bot *oauth* password (**NOT** the Twitch password, [get your *oauth* password here](https://twitchapps.com/tmi/))
@@ -63,11 +62,11 @@ process.on('SIGINT', () => {
 - **autoExit** {boolean} - Set to `false` to disable exit after stream is offline for 30 minutes (default: `true`)
 - **debug** {boolean} - Set to `true` to turn on debug logging (default: `false`)
 
-### Command Map
+## Command Map
 
 Map commands to your bot using the `commands` option in your `config`. Commands can map to a `string`, or a `function` that either returns a `string` or returns a `Promise` that resolves a `string`. If you do not want your bot to respond, don't return anything.
 
-##### String example
+**String example**
 
 This command map will respond to the command `!test` with `It works!`:
 
@@ -77,18 +76,18 @@ commands: {
 }
 ```
 
-###### Twitch chat
+Twitch chat:
 
 ```
 @MuhName: !test all the things
 @MuhBot: It works!
 ```
 
-##### Function example
+**Function example**
 
 If mapped to a function, the text you return or resolve will be sent to the Twitch chat. If you return or resolve anything other than a `string`, your bot will do nothing.
 
-###### Arguments
+_**Arguments**_
 
 - **args** {string[]} - Array of arguments from the chat command
 - **mod** {boolean} - Whether or not the sender is a moderator
@@ -120,14 +119,14 @@ commands: {
 }
 ```
 
-###### Twitch chat
+Twitch chat:
 
 ```
 @MuhName: !giphy funky chicken
 @MuhBot: http://media4.giphy.com/media/3oGRFBMkvqEzGKtwcw/giphy.gif
 ```
 
-##### Available commands
+**Available commands**
 
 Every bot supports the `!cmd` command which lists all of the available commands
 
@@ -136,16 +135,16 @@ Every bot supports the `!cmd` command which lists all of the available commands
 @MuhBot: Available Commands: !test, !giphy
 ```
 
-### Timers
+## Timers
 
 Create messages that run on intervals using the `timers` option in your `config`.
 
-##### Timer object
+**Timer object**
 
 - **seconds** {number} - Number of seconds between each tick
 - **handler** {string | function&lt;string | Promise&lt;string&gt;&gt;} - Handler for the timer
 
-##### Example
+**Example**
 
 ```
 timers: [{
@@ -154,7 +153,7 @@ timers: [{
 }]
 ```
 
-### Available methods
+## Available methods
 
 Timeout a user in chat using
 ```
@@ -171,7 +170,7 @@ Say something to chat using
 twitchcmd.say('message for chat');
 ```
 
-### Spam Filters
+## Spam Filters
 
 - Excessive capital letters - triggered when 10 or more capital letters make up a majority of the message
 
