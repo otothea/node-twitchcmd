@@ -60,6 +60,7 @@ process.on('SIGINT', () => {
 - **partMessage** {string} - The message your bot posts to chat when it leaves the channel (default: no message)
 - **filterSpam** {boolean} - Set to `true` to enable spam filters (default: `false`) See [Spam Filters](#spam-filters)
 - **maxOffenses** {number} - Number of offenses before user is banned (default `3`) See [Spam Filters](#spam-filters)
+- **autoExit** {boolean} - Set to `false` to disable exit after stream is offline for 30 minutes (default: `true`)
 - **debug** {boolean} - Set to `true` to turn on debug logging (default: `false`)
 
 ### Command Map
@@ -153,12 +154,24 @@ timers: [{
 }]
 ```
 
+### Available methods
+
+Timeout a user in chat using
+```
+twitchcmd.timeout('username', 30, 'reason for timeout');
+```
+
+Ban a user in chat using
+```
+twitchcmd.ban('username', 'reason for ban');
+```
+
 ### Spam Filters
 
 - Excessive capital letters - triggered when 10 or more capital letters make up a majority of the message
 
 If a user triggers a spam filter, they will be timed out for 10 seconds for the first offense and 60 seconds for each offense after. If a user hits the `maxOffense` limit, they will be banned from the channel.
 
-**NOTE:** Moderators can unban users from the channel by typing `/unban <username>` in the twitch chat
+**NOTE:** Moderators can manually unban users from the channel by typing `/unban <username>` in the twitch chat
 
 More filters to come, suggestions welcome

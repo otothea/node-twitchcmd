@@ -1,27 +1,37 @@
 // Require dependencies
 
 var irc       = require('irc');
+var request   = require('request');
 var helpers   = require('./lib/helpers');
 var constants = require('./lib/constants');
 
 // Set up app
 
-var initialized  = false;
-var exited       = false;
-var config       = null;
-var client       = null;
-var users        = {};
-var messageCount = 0;
+var initialized     = false; // {boolean}    - whether or not the app has been initialized
+var exited          = false; // {boolean}    - whether or not the app has been exited
+var config          = null;  // {object}     - configuration object for the app
+var client          = null;  // {irc.Client} - the irc client
+var users           = {};    // {object}     - users in the channel, indexed by nickname
+var lastCommandUse  = {};    // {object}     - unix timestamp of the last command usage
+var streamInterval  = null;  // {interval}   - interval for stream checking
+var streamLive      = true;  // {boolean}    - whether or not the channel stream is live on Twitch
+var streamOfflineAt = null;  // {number}     - timestamp of when the stream went offline
 
 module.exports = {
-    init: init,
-    exit: exit
+    init:    init,
+    exit:    exit,
+    timeout: timeoutUser,
+    ban:     banUser,
+    say:     say,
 };
 
 return;
 
-// Exports
-
+/**
+ * Init the twitch bot
+ *
+ * @param _config {object} - config to init the bot with
+ */
 function init(_config) {
     if (initialized)
         return;
@@ -31,6 +41,9 @@ function init(_config) {
 
     // Create a user for the bot
     users[config.name] = helpers.createUser(true);
+
+    // Create a user for the channel owner
+    users[config.channel.replace('#', '')] = helpers.createUser(true);
 
     // Init the client
     client = new irc.Client(config.server, config.name, {
@@ -51,16 +64,14 @@ function init(_config) {
     client.addListener('message' + config.channel, onMessage);
     client.addListener('raw',                      onRaw);
 
-    // Init the timers
-    config.timers.forEach(function(timer) {
-        helpers.createTimeout(timer, onTimer);
-    });
-
     initialized = true;
 }
 
+/**
+ * Exit the twitch bot
+ */
 function exit() {
-    if (exited)
+    if (!initialized || exited)
         return;
 
     log('Exiting...', true);
@@ -69,10 +80,14 @@ function exit() {
     if (client)
         client.part(config.channel);
 
+    clearInterval(streamInterval);
+
     exited = true;
 }
 
-// Event Handlers
+/**
+ * Event handlers
+ */
 
 function onError(message) {
     error(message, true);
@@ -93,8 +108,19 @@ function onJoin(name) {
     log('join: ' + name);
 
     // Say the join message
-    if (name === config.name)
+    if (name === config.name) {
         say(config.joinMessage);
+
+        // Init stream checker
+        if (config.autoExit) {
+            streamInterval = setInterval(onCheckStream, 60 * 1000)
+        }
+
+        // Init the timers
+        config.timers.forEach(function(timer) {
+            helpers.createTimeout(timer, onTimer);
+        });
+    }
 
     // Index user with defaults
     users[name] = users[name] || helpers.createUser();
@@ -114,7 +140,7 @@ function onPart(name) {
 }
 
 function onMotd(motd) {
-    log('MOTD:\n' + motd);
+    log('\nMOTD:\n' + motd);
 }
 
 function onNotice(name, to, text, message) {
@@ -123,9 +149,6 @@ function onNotice(name, to, text, message) {
 
 function onMessage(from, message) {
     log('message: ' + from + ' => ' + message);
-
-    // Increment message count
-    messageCount++;
 
     // Ignore if spam
     if (isSpam(from, message))
@@ -140,15 +163,24 @@ function onCommand(from, message) {
     // Strip the command prefix from the message
     message = message.substr(config.commandPrefix.length).toLowerCase();
 
+    // Get mod status
+    var mod = users[from] && users[from].mod;
+
     // Split up the message into command and arguments array
     var parts   = message.split(' ');
     var command = parts[0];
     var args    = parts.slice(1);
 
+    // Check last command usage time
+    var then = lastCommandUse[message]
+    var now  = Math.round(Date.now() / 1000);
+    var diff = now - then;
+    if (!mod && !isNaN(diff) && diff <= 10)
+        return;
+
     // If it's a valid command
     if (config.commands[command]) {
         var handler = config.commands[command];
-        var mod     = users[from] && users[from].mod;
 
         // If it's a function, run it
         if (typeof handler === 'function') {
@@ -169,6 +201,9 @@ function onCommand(from, message) {
         if (commands.length)
             say('Available Commands: ' + config.commandPrefix + commands.join(', ' + config.commandPrefix));
     }
+
+    // Update last command usage time
+    lastCommandUse[message] = now;
 }
 
 function onRaw(message) {
@@ -192,9 +227,8 @@ function onMode(channel, by, mode, argument, message) {
             users[argument].mod = true;
         }
         // Subtract mod
-        else if (mode === constants.MODES.SUB_MOD && users[argument]) {
+        else if (mode === constants.MODES.SUB_MOD && users[argument])
             users[argument].mod = false;
-        }
     }
 }
 
@@ -219,8 +253,51 @@ function onTimer(timer) {
     helpers.createTimeout(timer, onTimer);
 }
 
+function onCheckStream() {
+    // See if stream is live
+    // https://dev.twitch.tv/docs/api/v3/streams#get-streamschannel
+    var url  = constants.TWITCH_API_URI + 'streams/' + config.channel.replace('#', '');
+    var opts = {
+        json: true,
+        headers: {
+            'Client-ID': constants.TWITCH_CLIENT_ID
+        }
+    };
+
+    request.get(url, opts, function(err, res) {
+        var data = res.body || {};
+
+        if (data.stream) {
+            log('stream: live');
+
+            streamLive = true;
+        }
+        else {
+            log('stream: offline');
+
+            var now = Math.round(Date.now() / 1000);
+            if (streamLive)
+                streamOfflineAt = now
+            else {
+                var timeLimit = now - (60 * 30); // 30 minutes ago
+                if (streamOfflineAt <= timeLimit && config.autoExit)
+                    exit();
+            }
+            streamLive = false;
+        }
+    });
+}
+
 // Helper functions
 
+/**
+ * Check if message is spam
+ *
+ * @param from    {string} - nickname of user who sent the message
+ * @param message {string} - message being sent
+ *
+ * @returns {boolean} - true if spam, false if not
+ */
 function isSpam(from, message) {
     if (!config.filterSpam)
         return false;
@@ -230,19 +307,34 @@ function isSpam(from, message) {
 
     var uppercaseCount = message.replace(/[^A-Z]/g, "").length;
     if (uppercaseCount >= 10 && uppercaseCount >= message.length / 2) {
-        timeoutUser(from, 'stop using capital letters');
+        timeoutUser(from, null, 'stop using capital letters');
         return true;
     }
 
     return false;
 }
 
-function twitchCommand(command, message) {
-    if (typeof command === 'string')
-        client.send('PRIVMSG', config.channel, '/' + command + ' ' + (message || ''));
+/**
+ * Send a command to twitch
+ * https://help.twitch.tv/customer/portal/articles/659095-chat-moderation-commands
+ *
+ * @param command {string} - command to send
+ * @param args    {string} - arguments for the command
+ */
+function twitchCommand(command, args) {
+    if (!client || typeof command !== 'string')
+        return;
+
+    client.send('PRIVMSG', config.channel, '/' + command + ' ' + (args || ''));
 }
 
-function timeoutUser(name, reason) {
+/**
+ * Timeout a user in chat
+ *
+ * @param name   {string} - nickname of the user to timeout
+ * @param reason {string} - the reason for the timeout
+ */
+function timeoutUser(name, seconds, reason) {
     name   = name   || '';
     reason = reason || '';
 
@@ -254,25 +346,49 @@ function timeoutUser(name, reason) {
     if (offenses > config.maxOffenses)
         banUser(name);
     else {
-        var seconds = offenses === 1 ? 10 : 60;
+        seconds = seconds || offenses === 1 ? 10 : 60;
         twitchCommand('timeout', name + ' ' + seconds + ' ' + reason + ' - warning ' + offenses + ' of ' + config.maxOffenses);
     }
 }
 
+/**
+ * Ban a user in chat
+ *
+ * @param name {string} - nickname of the user to ban
+ */
 function banUser(name) {
     twitchCommand('ban', name + ' too many chat offenses');
 }
 
+/**
+ * Say a message to chat
+ *
+ * @param message {string} - send a message to chat
+ */
 function say(message) {
-    if (typeof message === 'string')
-        client.say(config.channel, message);
+    if (!client || typeof message !== 'string')
+        return;
+
+    client.say(config.channel, message);
 }
 
+/**
+ * Log a message
+ *
+ * @param message {string}  - message to log
+ * @param force   {boolean} - set to `true` to force log even if not debug
+ */
 function log(message, force) {
     if (config.debug || force)
         console.log(message);
 }
 
+/**
+ * Log an error
+ *
+ * @param message {string}  - message to log
+ * @param force   {boolean} - set to `true` to force log even if not debug
+ */
 function error(message, force) {
     if (config.debug || force)
         console.log('Error:', message);
