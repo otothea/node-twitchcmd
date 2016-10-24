@@ -8,7 +8,7 @@ var commands = {
 var timers = [{
     seconds: 10,
     handler: function() {
-        return giphy(['test']);
+        return giphy(['test'], true);
     }
 }];
 

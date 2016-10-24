@@ -2,20 +2,24 @@
 
 var irc       = require('irc');
 var request   = require('request');
+var Discord   = require('discord.io');
 var helpers   = require('./lib/helpers');
 var constants = require('./lib/constants');
 
 // Set up app
 
-var initialized     = false; // {boolean}    - whether or not the app has been initialized
-var exited          = false; // {boolean}    - whether or not the app has been exited
-var config          = null;  // {object}     - configuration object for the app
-var client          = null;  // {irc.Client} - the irc client
-var users           = {};    // {object}     - users in the channel, indexed by nickname
-var lastCommandUse  = {};    // {object}     - unix timestamp of the last command usage
-var streamInterval  = null;  // {interval}   - interval for stream checking
-var streamLive      = true;  // {boolean}    - whether or not the channel stream is live on Twitch
-var streamOfflineAt = null;  // {number}     - timestamp of when the stream went offline
+var initialized     = false;                         // {boolean}        - whether or not the app has been initialized
+var exited          = false;                         // {boolean}        - whether or not the app has been exited
+var config          = null;                          // {object}         - configuration object for the app
+var ircClient       = null;                          // {irc.Client}     - the irc client
+var discordClient   = null;                          // {Discord.Client} - the discord client
+var users           = {};                            // {object}         - users in the channel, indexed by nickname
+var lastCommandUse  = {};                            // {object}         - unix timestamp of the last command usage
+var streamInterval  = null;                          // {interval}       - interval for stream checking
+var streamLive      = false;                         // {boolean}        - whether or not the channel stream is live on Twitch
+var streamOfflineAt = Math.round(Date.now() / 1000); // {number}         - timestamp of when the stream went offline
+var timeouts        = [];                            // {timeout[]}      - array of timeout pointers for clearing timeouts
+var discordReady    = false;                         // {boolean}        - whether or not discord is ready
 
 module.exports = {
     init:    init,
@@ -46,7 +50,7 @@ function init(_config) {
     users[config.channel.replace('#', '')] = helpers.createUser(true);
 
     // Init the client
-    client = new irc.Client(config.server, config.name, {
+    ircClient = new irc.Client(config.server, config.name, {
         userName: config.name,
         realName: config.name,
         password: config.password,
@@ -55,14 +59,30 @@ function init(_config) {
     });
 
     // Add listeners
-    client.addListener('error',                    onError);
-    client.addListener('registered',               onRegistered);
-    client.addListener('join' + config.channel,    onJoin);
-    client.addListener('part' + config.channel,    onPart);
-    client.addListener('motd',                     onMotd);
-    client.addListener('notice',                   onNotice);
-    client.addListener('message' + config.channel, onMessage);
-    client.addListener('raw',                      onRaw);
+    ircClient.addListener('error',                    onError);
+    ircClient.addListener('registered',               onRegistered);
+    ircClient.addListener('join' + config.channel,    onJoin);
+    ircClient.addListener('part' + config.channel,    onPart);
+    ircClient.addListener('motd',                     onMotd);
+    ircClient.addListener('notice',                   onNotice);
+    ircClient.addListener('message' + config.channel, onMessage);
+    ircClient.addListener('raw',                      onRaw);
+
+    // If there is a discord token
+    if (config.discordToken) {
+        // Init the discord client
+        discordClient = new Discord.Client({
+            token:   config.discordToken,
+            autorun: true,
+        });
+
+        // Add listeners
+        discordClient.on('ready', onDiscordReady);
+    }
+
+    // Init stream checker
+    if (config.autoExit)
+        streamInterval = setInterval(onCheckStream, 60 * 1000)
 
     initialized = true;
 }
@@ -76,11 +96,22 @@ function exit() {
 
     log('Exiting...', true);
 
-    // Leave the channel
-    if (client)
-        client.part(config.channel);
+    // Leave the twitch channel
+    if (ircClient)
+        ircClient.part(config.channel);
 
-    clearInterval(streamInterval);
+    // Leave discord
+    if (discordClient)
+        discordClient.disconnect();
+
+    // Clear the stream check interval
+    if (streamInterval)
+        clearInterval(streamInterval);
+
+    // Clear all the timeouts
+    timeouts.forEach(function(t) {
+        clearTimeout(t);
+    });
 
     exited = true;
 }
@@ -93,15 +124,19 @@ function onError(message) {
     error(message, true);
 }
 
+function onDiscordReady() {
+    discordReady = true;
+}
+
 function onRegistered() {
     log('Initialized...', true);
 
     // Send the Capabilities command
     // https://help.twitch.tv/customer/portal/articles/1302780-twitch-irc
-    client.send('CAP', 'REQ', constants.TWTTCH_MEMBERSHIP);
+    ircClient.send('CAP', 'REQ', constants.TWTTCH_MEMBERSHIP);
 
     // Join the channel
-    client.join(config.channel);
+    ircClient.join(config.channel);
 }
 
 function onJoin(name) {
@@ -111,14 +146,9 @@ function onJoin(name) {
     if (name === config.name) {
         say(config.joinMessage);
 
-        // Init stream checker
-        if (config.autoExit) {
-            streamInterval = setInterval(onCheckStream, 60 * 1000)
-        }
-
         // Init the timers
-        config.timers.forEach(function(timer) {
-            helpers.createTimeout(timer, onTimer);
+        config.timers.forEach(function(timer, i) {
+            timeouts[i] = helpers.createTimeout(timer, i, onTimer);
         });
     }
 
@@ -132,7 +162,8 @@ function onPart(name) {
     // If we have exited, disconnect
     if (name === config.name && exited) {
         say(config.partMessage);
-        client.disconnect();
+
+        ircClient.disconnect();
     }
 
     // Remove user from index
@@ -232,7 +263,7 @@ function onMode(channel, by, mode, argument, message) {
     }
 }
 
-function onTimer(timer) {
+function onTimer(timer, i) {
     // If function, run it
     if (typeof timer.handler === 'function') {
         // Call the handler and convert to promise
@@ -241,7 +272,8 @@ function onTimer(timer) {
         response.then(function(message) {
             say(message);
 
-            helpers.createTimeout(timer, onTimer);
+            // Start a new timeout
+            timeouts[i] = helpers.createTimeout(timer, i, onTimer);
         });
 
         return;
@@ -250,7 +282,7 @@ function onTimer(timer) {
     else if (typeof timer.handler === 'string')
         say(timer.handler);
 
-    helpers.createTimeout(timer, onTimer);
+    timeouts[i] = helpers.createTimeout(timer, i, onTimer);
 }
 
 function onCheckStream() {
@@ -270,9 +302,13 @@ function onCheckStream() {
         if (data.stream) {
             log('stream: live');
 
+            // If the stream was offline before
+            if (streamLive === false)
+                onDiscordAnnounce(data.stream);
+
             streamLive = true;
         }
-        else {
+        else if (data.stream === null) {
             log('stream: offline');
 
             var now = Math.round(Date.now() / 1000);
@@ -283,8 +319,24 @@ function onCheckStream() {
                 if (streamOfflineAt <= timeLimit && config.autoExit)
                     exit();
             }
+
             streamLive = false;
         }
+    });
+}
+
+function onDiscordAnnounce(stream) {
+    if (!discordReady)
+        return;
+
+    // Create the message
+    var message = stream.channel.display_name + ' is streaming ' +
+        stream.game + ' - ' + stream.channel.status + ' @ ' +
+        stream.channel.url;
+
+    // Send an announcement to all the discord channels
+    config.discordChannels.forEach(function(id) {
+        sendDiscordMessage(id, message);
     });
 }
 
@@ -302,10 +354,12 @@ function isSpam(from, message) {
     if (!config.filterSpam)
         return false;
 
+    // Skip if this is a mod
     if (users[from] && users[from].mod)
         return false;
 
-    var uppercaseCount = message.replace(/[^A-Z]/g, "").length;
+    // Check for capital letter spam
+    var uppercaseCount = message.replace(/[^A-Z]/g, '').length;
     if (uppercaseCount >= 10 && uppercaseCount >= message.length / 2) {
         timeoutUser(from, null, 'stop using capital letters');
         return true;
@@ -322,22 +376,24 @@ function isSpam(from, message) {
  * @param args    {string} - arguments for the command
  */
 function twitchCommand(command, args) {
-    if (!client || typeof command !== 'string')
+    if (!ircClient || typeof command !== 'string')
         return;
 
-    client.send('PRIVMSG', config.channel, '/' + command + ' ' + (args || ''));
+    ircClient.send('PRIVMSG', config.channel, '/' + command + ' ' + (args || ''));
 }
 
 /**
  * Timeout a user in chat
  *
- * @param name   {string} - nickname of the user to timeout
- * @param reason {string} - the reason for the timeout
+ * @param name    {string}      - nickname of the user to timeout
+ * @param seconds {number|null} - number of seconds to timeout
+ * @param reason  {string}      - the reason for the timeout
  */
 function timeoutUser(name, seconds, reason) {
     name   = name   || '';
     reason = reason || '';
 
+    // Create a user if it doesn't exist
     users[name] = users[name] || helpers.createUser();
     users[name].offenses++;
 
@@ -366,17 +422,33 @@ function banUser(name) {
  * @param message {string} - send a message to chat
  */
 function say(message) {
-    if (!client || typeof message !== 'string')
+    if (!ircClient || typeof message !== 'string')
         return;
 
-    client.say(config.channel, message);
+    ircClient.say(config.channel, message);
+}
+
+/**
+ * Send a message to Discord channel
+ *
+ * @param id      {string} - id of the channel to send message
+ * @param message {string} - message to send to channel
+ */
+function sendDiscordMessage(id, message) {
+    if (!discordClient || typeof id !== 'string' || typeof message !== 'string')
+        return;
+
+    discordClient.sendMessage({
+        to:      id,
+        message: message
+    });
 }
 
 /**
  * Log a message
  *
  * @param message {string}  - message to log
- * @param force   {boolean} - set to `true` to force log even if not debug
+ * @param [force] {boolean} - set to `true` to force log even if not debug
  */
 function log(message, force) {
     if (config.debug || force)
@@ -387,7 +459,7 @@ function log(message, force) {
  * Log an error
  *
  * @param message {string}  - message to log
- * @param force   {boolean} - set to `true` to force log even if not debug
+ * @param [force] {boolean} - set to `true` to force log even if not debug
  */
 function error(message, force) {
     if (config.debug || force)

@@ -9,6 +9,7 @@
   "author": "Oscar Armstrong <oscar@otothea.com> (https://github.com/otothea)",
   "license": "MIT",
   "dependencies": {
+    "discord.io": "2.2.4",
     "irc": "0.5.0",
     "joi": "9.0.4",
     "request": "2.75.0"

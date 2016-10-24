@@ -10,7 +10,11 @@ Twitch Command is a simple [node-irc](https://github.com/martynsmith/node-irc) c
 
 ## Prerequisites
 
-- [Create a twitch account for your bot](https://twitch.tv/signup)
+- [Create a Twitch account for your bot](https://twitch.tv/signup)
+
+## Optional
+
+- [Create and Authorize Discord application with bot user](https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token)
 
 ## Install
 
@@ -37,7 +41,9 @@ var config = {
     timers: [{
         seconds: 300,
         handler: 'Still here!'
-    }]
+    }],
+    discordToken: 'XXXXXXXXXXXXXXXXXXXXXXXX.XXXXXX.XXXXXXXXXXXXXXXXXXXXXXXXXXX',
+    discordChannels: [239437482611690752, 239425674160837378]
 }
  
 twitchcmd.init(config);
@@ -61,6 +67,8 @@ process.on('SIGINT', () => {
 - **maxOffenses** {number} - Number of offenses before user is banned (default `3`) See [Spam Filters](#spam-filters)
 - **autoExit** {boolean} - Set to `false` to disable exit after stream is offline for 30 minutes (default: `true`)
 - **debug** {boolean} - Set to `true` to turn on debug logging (default: `false`)
+- **discordToken** {string} - The token for your Discord bot (default: `null` [how to get your token from discord](https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token))
+- **discordChannels** {number[]} - Array of channel IDs to announce in when Twitch stream goes live (default: `[]` [how to get channel ids from Discord app](https://github.com/Chikachi/DiscordIntegration/wiki/How-to-get-a-token-and-channel-ID-for-Discord#get-the-channel-id-of-the-discord-text-channel))
 
 ## Command Map
 
