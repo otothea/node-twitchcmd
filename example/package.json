@@ -1,5 +1,5 @@
 {
-  "name": "twitch-otothebot",
+  "name": "twitch-examplebot",
   "version": "0.0.1",
   "description": "Example of how to use Twitch Command",
   "main": "index.js",
@@ -11,6 +11,6 @@
   "license": "MIT",
   "dependencies": {
     "request": "2.75.0",
-    "twitchcmd": "0.0.7"
+    "twitchcmd": "0.0.8"
   }
 }
