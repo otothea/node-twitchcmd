@@ -69,6 +69,7 @@ process.on('SIGINT', () => {
 - **debug** {boolean} - Set to `true` to turn on debug logging (default: `false`)
 - **discordToken** {string} - The token for your Discord bot (default: `null` [how to get your token from discord](https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token))
 - **discordChannels** {number[]} - Array of channel IDs to announce in when Twitch stream goes live (default: `[]` [how to get channel ids from Discord app](https://github.com/Chikachi/DiscordIntegration/wiki/How-to-get-a-token-and-channel-ID-for-Discord#get-the-channel-id-of-the-discord-text-channel))
+- **log** {string | boolean} - Set to `false` to disable chat logging, or set to absolute path of logs directory to override default directory (default: `./logs`)
 
 ## Command Map
 

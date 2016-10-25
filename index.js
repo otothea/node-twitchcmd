@@ -1,25 +1,29 @@
 // Require dependencies
 
+var fs        = require('fs');
+var path      = require('path');
 var irc       = require('irc');
 var request   = require('request');
+var moment    = require('moment');
+var mkdirp    = require('mkdirp');
 var Discord   = require('discord.io');
 var helpers   = require('./lib/helpers');
 var constants = require('./lib/constants');
 
 // Set up app
 
-var initialized     = false;                         // {boolean}        - whether or not the app has been initialized
-var exited          = false;                         // {boolean}        - whether or not the app has been exited
-var config          = null;                          // {object}         - configuration object for the app
-var ircClient       = null;                          // {irc.Client}     - the irc client
-var discordClient   = null;                          // {Discord.Client} - the discord client
-var users           = {};                            // {object}         - users in the channel, indexed by nickname
-var lastCommandUse  = {};                            // {object}         - unix timestamp of the last command usage
-var streamInterval  = null;                          // {interval}       - interval for stream checking
-var streamLive      = false;                         // {boolean}        - whether or not the channel stream is live on Twitch
-var streamOfflineAt = Math.round(Date.now() / 1000); // {number}         - timestamp of when the stream went offline
-var timeouts        = [];                            // {timeout[]}      - array of timeout pointers for clearing timeouts
-var discordReady    = false;                         // {boolean}        - whether or not discord is ready
+var initialized     = false; // {boolean}        - whether or not the app has been initialized
+var exited          = false; // {boolean}        - whether or not the app has been exited
+var config          = null;  // {object}         - configuration object for the app
+var ircClient       = null;  // {irc.Client}     - the irc client
+var discordClient   = null;  // {Discord.Client} - the discord client
+var users           = {};    // {object}         - users in the channel, indexed by nickname
+var lastCommandUse  = {};    // {object}         - unix timestamp of the last command usage
+var streamInterval  = null;  // {interval}       - interval for stream checking
+var streamLive      = true;  // {boolean}        - whether or not the channel stream is live on Twitch
+var streamOfflineAt = null;  // {number}         - timestamp of when the stream went offline
+var timeouts        = [];    // {timeout[]}      - array of timeout pointers for clearing timeouts
+var discordReady    = false; // {boolean}        - whether or not discord is ready
 
 module.exports = {
     init:    init,
@@ -80,8 +84,12 @@ function init(_config) {
         discordClient.on('ready', onDiscordReady);
     }
 
+    // If we are logging, create the directory if not exists
+    if (config.log && typeof config.log === 'string')
+        mkdirp.sync(config.log);
+
     // Init stream checker
-    if (config.autoExit)
+    if (config.autoExit || config.discordToken)
         streamInterval = setInterval(onCheckStream, 60 * 1000)
 
     initialized = true;
@@ -181,6 +189,9 @@ function onNotice(name, to, text, message) {
 function onMessage(from, message) {
     log('message: ' + from + ' => ' + message);
 
+    // Log the message
+    logChat(from, message);
+
     // Ignore if spam
     if (isSpam(from, message))
         return;
@@ -204,7 +215,7 @@ function onCommand(from, message) {
 
     // Check last command usage time
     var then = lastCommandUse[message]
-    var now  = Math.round(Date.now() / 1000);
+    var now  = moment().unix();
     var diff = now - then;
     if (!mod && !isNaN(diff) && diff <= 10)
         return;
@@ -232,6 +243,8 @@ function onCommand(from, message) {
         if (commands.length)
             say('Available Commands: ' + config.commandPrefix + commands.join(', ' + config.commandPrefix));
     }
+    else if (command === 'ping')
+        say('pong');
 
     // Update last command usage time
     lastCommandUse[message] = now;
@@ -297,7 +310,7 @@ function onCheckStream() {
     };
 
     request.get(url, opts, function(err, res) {
-        var data = res.body || {};
+        var data = (res || {}).body || {};
 
         if (data.stream) {
             log('stream: live');
@@ -311,7 +324,7 @@ function onCheckStream() {
         else if (data.stream === null) {
             log('stream: offline');
 
-            var now = Math.round(Date.now() / 1000);
+            var now = moment().unix();
             if (streamLive)
                 streamOfflineAt = now
             else {
@@ -441,6 +454,32 @@ function sendDiscordMessage(id, message) {
     discordClient.sendMessage({
         to:      id,
         message: message
+    });
+}
+
+/**
+ * Log message to chat logs
+ *
+ * @param from    {string} - name of person sending the message
+ * @param message {string} - the message sent
+ */
+function logChat(from, message) {
+    if (typeof config.log !== 'string' || !from || typeof message !== 'string')
+        return;
+
+    // Get the current moment
+    var now  = moment();
+
+    // Create the file name
+    var file = path.join(config.log, now.format('YYYY-MM-DD') + '-' + 'chat.log');
+
+    // Create the text to log based on moment and chat info
+    var text = '[' + now.format('YYYY-MM-DD hh:mm A') + '] ' + from + ': ' + message + '\n';
+
+    // Append the text to the log file
+    fs.appendFile(file, text, function(err) {
+        if (err)
+            error(err);
     });
 }
 
