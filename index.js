@@ -81,7 +81,8 @@ function init(_config) {
         });
 
         // Add listeners
-        discordClient.on('ready', onDiscordReady);
+        discordClient.on('ready',   onDiscordReady);
+        discordClient.on('message', onDiscordMessage);
     }
 
     // If we are logging, create the directory if not exists
@@ -93,6 +94,10 @@ function init(_config) {
         streamInterval = setInterval(onCheckStream, 60 * 1000)
 
     initialized = true;
+}
+
+function onDiscordMessage(user, userID, channelID, message, event) {
+    onMessage(user, message, channelID);
 }
 
 /**
@@ -186,8 +191,8 @@ function onNotice(name, to, text, message) {
     log('notice: ' + name + ' ' + to + ' ' + text + ' ' + message);
 }
 
-function onMessage(from, message) {
-    log('message: ' + from + ' => ' + message);
+function onMessage(from, message, channelID) {
+    log('message: ' + from + ' => ' + message + ' => ' + channelID);
 
     // Log the message
     logChat(from, message);
@@ -198,10 +203,10 @@ function onMessage(from, message) {
 
     // Check for command prefix
     if (message.indexOf(config.commandPrefix) === 0)
-        onCommand(from, message);
+        onCommand(from, message, channelID);
 }
 
-function onCommand(from, message) {
+function onCommand(from, message, channelID) {
     // Strip the command prefix from the message
     message = message.substr(config.commandPrefix.length).toLowerCase();
 
@@ -229,11 +234,13 @@ function onCommand(from, message) {
             // Call the handler and convert to promise
             var response = handler(args, mod);
             response = Promise.resolve(response);
-            response.then(say);
+            response.then(function(message) {
+                say(message, channelID);
+            });
         }
         // If it's a string, just say it
         else if (typeof handler === 'string')
-            say(handler);
+            say(handler, channelID);
     }
     // Available commands
     else if (command === 'cmd') {
@@ -241,10 +248,10 @@ function onCommand(from, message) {
 
         // If commands exist
         if (commands.length)
-            say('Available Commands: ' + config.commandPrefix + commands.join(', ' + config.commandPrefix));
+            say('Available Commands: ' + config.commandPrefix + commands.join(', ' + config.commandPrefix), channelID);
     }
     else if (command === 'ping')
-        say('pong');
+        say('pong', channelID);
 
     // Update last command usage time
     lastCommandUse[message] = now;
@@ -434,7 +441,12 @@ function banUser(name) {
  *
  * @param message {string} - send a message to chat
  */
-function say(message) {
+function say(message, channelID) {
+    if (channelID) {
+        sendDiscordMessage(channelID, message);
+        return;
+    }
+
     if (!ircClient || typeof message !== 'string')
         return;
 
