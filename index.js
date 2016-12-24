@@ -96,10 +96,6 @@ function init(_config) {
     initialized = true;
 }
 
-function onDiscordMessage(user, userID, channelID, message, event) {
-    onMessage(user, message, channelID);
-}
-
 /**
  * Exit the twitch bot
  */
@@ -189,6 +185,10 @@ function onMotd(motd) {
 
 function onNotice(name, to, text, message) {
     log('notice: ' + name + ' ' + to + ' ' + text + ' ' + message);
+}
+
+function onDiscordMessage(user, userID, channelID, message) {
+  onMessage(user, message, channelID);
 }
 
 function onMessage(from, message, channelID) {
@@ -439,9 +439,12 @@ function banUser(name) {
 /**
  * Say a message to chat
  *
- * @param message {string} - send a message to chat
+ * @param message     {string} - send a message to chat
+ * @param [channelID] {string} - id of discord channel
  */
 function say(message, channelID) {
+    channelID = channelID || false;
+
     if (channelID) {
         sendDiscordMessage(channelID, message);
         return;
