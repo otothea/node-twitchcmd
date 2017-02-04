@@ -48,36 +48,36 @@ function init(_config) {
   config = helpers.validateConfig(_config);
 
   // Create a user for the bot
-  users[config.name] = helpers.createUser(true);
+  users[config.twitch.name] = helpers.createUser(true);
 
   // Create a user for the channel owner
-  var name = config.channel.replace('#', '');
+  var name = config.twitch.channel.replace('#', '');
   users[name] = helpers.createUser(true);
 
   // Init the client
-  ircClient = new irc.Client(config.server, config.name, {
-    userName: config.name,
-    realName: config.name,
-    password: config.password,
-    port:     config.port,
-    secure:   config.secure,
+  ircClient = new irc.Client(config.twitch.server, config.twitch.name, {
+    userName: config.twitch.name,
+    realName: config.twitch.name,
+    password: config.twitch.password,
+    port:     config.twitch.port,
+    secure:   config.twitch.secure,
   });
 
   // Add listeners
-  ircClient.addListener('error',                    onError);
-  ircClient.addListener('registered',               onRegistered);
-  ircClient.addListener('join' + config.channel,    onJoin);
-  ircClient.addListener('part' + config.channel,    onPart);
-  ircClient.addListener('motd',                     onMotd);
-  ircClient.addListener('notice',                   onNotice);
-  ircClient.addListener('message' + config.channel, onMessage);
-  ircClient.addListener('raw',                      onRaw);
+  ircClient.addListener('error',                           onError);
+  ircClient.addListener('registered',                      onRegistered);
+  ircClient.addListener('join' + config.twitch.channel,    onJoin);
+  ircClient.addListener('part' + config.twitch.channel,    onPart);
+  ircClient.addListener('motd',                            onMotd);
+  ircClient.addListener('notice',                          onNotice);
+  ircClient.addListener('message' + config.twitch.channel, onMessage);
+  ircClient.addListener('raw',                             onRaw);
 
   // If there is a discord token
-  if (config.discordToken) {
+  if (config.discord.token) {
     // Init the discord client
     discordClient = new Discord.Client({
-      token:   config.discordToken,
+      token:   config.discord.token,
       autorun: true,
     });
 
@@ -91,7 +91,7 @@ function init(_config) {
     mkdirp.sync(config.log);
 
   // Init stream checker
-  if (config.autoExit || config.discordToken)
+  if (config.autoExit || (config.discord.token && config.discord.channels.length))
     streamInterval = setInterval(onCheckStream, 60 * 1000)
 
   initialized = true;
@@ -108,11 +108,20 @@ function exit() {
 
   // Leave the twitch channel
   if (ircClient)
-    ircClient.part(config.channel);
+    ircClient.part(config.twitch.channel);
 
   // Leave discord
-  if (discordClient)
-    discordClient.disconnect();
+  if (discordClient) {
+    // Send leave message to all channels before disconnecting
+    Promise.all(config.discord.channels.map(function(id) {
+      return new Promise(function(resolve, reject) {
+        sendDiscordMessage(id, config.joinMessage, resolve);
+      });
+    }))
+    .then(function() {
+      discordClient.disconnect();
+    });
+  }
 
   // Clear the stream check interval
   if (streamInterval)
@@ -135,6 +144,11 @@ function onError(message) {
 }
 
 function onDiscordReady() {
+  // Send join message to all discord channels
+  config.discord.channels.forEach(function(id) {
+    sendDiscordMessage(id, config.joinMessage);
+  });
+
   discordReady = true;
 }
 
@@ -146,14 +160,14 @@ function onRegistered() {
   ircClient.send('CAP', 'REQ', constants.TWTTCH_MEMBERSHIP);
 
   // Join the channel
-  ircClient.join(config.channel);
+  ircClient.join(config.twitch.channel);
 }
 
 function onJoin(name) {
   log('join: ' + name);
 
   // Say the join message
-  if (name === config.name) {
+  if (name === config.twitch.name) {
     say(config.joinMessage);
 
     // Init the timers
@@ -170,7 +184,7 @@ function onPart(name) {
   log('part: ' + name);
 
   // If we have exited, disconnect
-  if (name === config.name && exited) {
+  if (name === config.twitch.name && exited) {
     say(config.partMessage);
 
     ircClient.disconnect();
@@ -189,11 +203,11 @@ function onNotice(name, to, text, message) {
 }
 
 function onDiscordMessage(user, userId, channelId, message) {
-  onMessage(user, message, channelId);
+  onMessage(user, message, {}, channelId);
 }
 
-function onMessage(from, message, channelId) {
-  log('message: ' + from + ' => ' + message + ' => ' + channelId);
+function onMessage(from, message, meta, channelId) {
+  log('message: ' + from + ' => ' + message + ' => ' + (channelId || config.twitch.channel));
 
   // Log the message
   logChat(from, message);
@@ -272,7 +286,7 @@ function onMode(channel, by, mode, argument, message) {
   log('mode: ' + channel + ' ' + by + ' ' + mode + ' ' + argument + ' ' + message);
 
   // If it's for this channel and sent from Twitch
-  if (channel === config.channel && by === constants.TWITCH_NAME) {
+  if (channel === config.twitch.channel && by === constants.TWITCH_NAME) {
     // Add mod
     if (mode === constants.MODES.ADD_MOD) {
       users[argument] = users[argument] || helpers.createUser();
@@ -309,7 +323,7 @@ function onTimer(timer, i) {
 function onCheckStream() {
   // See if stream is live
   // https://dev.twitch.tv/docs/api/v3/streams#get-streamschannel
-  var url  = constants.TWITCH_API_URI + 'streams/' + config.channel.replace('#', '');
+  var url  = constants.TWITCH_API_URI + 'streams/' + config.twitch.channel.replace('#', '');
   var opts = {
     json: true,
     headers: {
@@ -330,7 +344,7 @@ function onCheckStream() {
           stream.channel.url;
 
         // Send an announcement to all the discord channels
-        config.discordChannels.forEach(function(id) {
+        config.discord.channels.forEach(function(id) {
           sendDiscordMessage(id, message);
         });
       }
@@ -365,7 +379,7 @@ function onCheckStream() {
  * @returns {boolean} - true if spam, false if not
  */
 function isSpam(from, message) {
-  if (!config.filterSpam)
+  if (!config.twitch.filterSpam)
     return false;
 
   // Skip if this is a mod
@@ -393,7 +407,7 @@ function twitchCommand(command, args) {
   if (!ircClient || typeof command !== 'string')
     return;
 
-  ircClient.send('PRIVMSG', config.channel, '/' + command + ' ' + (args || ''));
+  ircClient.send('PRIVMSG', config.twitch.channel, '/' + command + ' ' + (args || ''));
 }
 
 /**
@@ -410,11 +424,11 @@ function timeoutUser(name, seconds, reason) {
 
   var offenses = users[name].offenses;
 
-  if (offenses > config.maxOffenses)
+  if (offenses > config.twitch.maxOffenses)
     banUser(name);
   else {
     seconds = seconds || (offenses === 1 ? 10 : 60);
-    twitchCommand('timeout', name + ' ' + seconds + ' ' + reason + ' - warning ' + offenses + ' of ' + config.maxOffenses);
+    twitchCommand('timeout', name + ' ' + seconds + ' ' + reason + ' - warning ' + offenses + ' of ' + config.twitch.maxOffenses);
   }
 }
 
@@ -444,7 +458,7 @@ function say(message, channelId) {
   if (!ircClient || typeof message !== 'string')
     return;
 
-  ircClient.say(config.channel, message);
+  ircClient.say(config.twitch.channel, message);
 }
 
 /**
@@ -453,14 +467,14 @@ function say(message, channelId) {
  * @param id      {string} - id of the channel to send message
  * @param message {string} - message to send to channel
  */
-function sendDiscordMessage(id, message) {
+function sendDiscordMessage(id, message, callback) {
   if (!discordClient || typeof id !== 'string' || typeof message !== 'string')
-    return;
+    return callback ? callback() : null;
 
   discordClient.sendMessage({
     to:      id,
     message: message,
-  });
+  }, callback);
 }
 
 /**

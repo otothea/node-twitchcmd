@@ -13,9 +13,11 @@ var timers = [{
 }];
 
 var config = {
-    name:        'examplebot',
-    password:    'oauth:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-    channel:     '#example',
+    twitch: {
+        name:     'examplebot',
+        password: 'oauth:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+        channel:  '#example',
+    },
     joinMessage: 'hi',
     partMessage: 'bye',
     debug:       true,
