@@ -26,11 +26,11 @@ var timeouts        = [];    // {timeout[]}      - array of timeout pointers for
 var discordReady    = false; // {boolean}        - whether or not discord is ready
 
 module.exports = {
-    init:    init,
-    exit:    exit,
-    timeout: timeoutUser,
-    ban:     banUser,
-    say:     say,
+  init:    init,
+  exit:    exit,
+  timeout: timeoutUser,
+  ban:     banUser,
+  say:     say,
 };
 
 return;
@@ -41,88 +41,89 @@ return;
  * @param _config {object} - config to init the bot with
  */
 function init(_config) {
-    if (initialized)
-        return;
+  if (initialized)
+    return;
 
-    // Validate the config
-    config = helpers.validateConfig(_config);
+  // Validate the config
+  config = helpers.validateConfig(_config);
 
-    // Create a user for the bot
-    users[config.name] = helpers.createUser(true);
+  // Create a user for the bot
+  users[config.name] = helpers.createUser(true);
 
-    // Create a user for the channel owner
-    users[config.channel.replace('#', '')] = helpers.createUser(true);
+  // Create a user for the channel owner
+  var name = config.channel.replace('#', '');
+  users[name] = helpers.createUser(true);
 
-    // Init the client
-    ircClient = new irc.Client(config.server, config.name, {
-        userName: config.name,
-        realName: config.name,
-        password: config.password,
-        port:     config.port,
-        secure:   config.secure,
+  // Init the client
+  ircClient = new irc.Client(config.server, config.name, {
+    userName: config.name,
+    realName: config.name,
+    password: config.password,
+    port:     config.port,
+    secure:   config.secure,
+  });
+
+  // Add listeners
+  ircClient.addListener('error',                    onError);
+  ircClient.addListener('registered',               onRegistered);
+  ircClient.addListener('join' + config.channel,    onJoin);
+  ircClient.addListener('part' + config.channel,    onPart);
+  ircClient.addListener('motd',                     onMotd);
+  ircClient.addListener('notice',                   onNotice);
+  ircClient.addListener('message' + config.channel, onMessage);
+  ircClient.addListener('raw',                      onRaw);
+
+  // If there is a discord token
+  if (config.discordToken) {
+    // Init the discord client
+    discordClient = new Discord.Client({
+      token:   config.discordToken,
+      autorun: true,
     });
 
     // Add listeners
-    ircClient.addListener('error',                    onError);
-    ircClient.addListener('registered',               onRegistered);
-    ircClient.addListener('join' + config.channel,    onJoin);
-    ircClient.addListener('part' + config.channel,    onPart);
-    ircClient.addListener('motd',                     onMotd);
-    ircClient.addListener('notice',                   onNotice);
-    ircClient.addListener('message' + config.channel, onMessage);
-    ircClient.addListener('raw',                      onRaw);
+    discordClient.on('ready',   onDiscordReady);
+    discordClient.on('message', onDiscordMessage);
+  }
 
-    // If there is a discord token
-    if (config.discordToken) {
-        // Init the discord client
-        discordClient = new Discord.Client({
-            token:   config.discordToken,
-            autorun: true,
-        });
+  // If we are logging, create the directory if not exists
+  if (config.log && typeof config.log === 'string')
+    mkdirp.sync(config.log);
 
-        // Add listeners
-        discordClient.on('ready',   onDiscordReady);
-        discordClient.on('message', onDiscordMessage);
-    }
+  // Init stream checker
+  if (config.autoExit || config.discordToken)
+    streamInterval = setInterval(onCheckStream, 60 * 1000)
 
-    // If we are logging, create the directory if not exists
-    if (config.log && typeof config.log === 'string')
-        mkdirp.sync(config.log);
-
-    // Init stream checker
-    if (config.autoExit || config.discordToken)
-        streamInterval = setInterval(onCheckStream, 60 * 1000)
-
-    initialized = true;
+  initialized = true;
 }
 
 /**
  * Exit the twitch bot
  */
 function exit() {
-    if (!initialized || exited)
-        return;
+  if (!initialized || exited)
+    return;
 
-    log('Exiting...', true);
+  log('Exiting...', true);
 
-    // Leave the twitch channel
-    if (ircClient)
-        ircClient.part(config.channel);
+  // Leave the twitch channel
+  if (ircClient)
+    ircClient.part(config.channel);
 
-    // Leave discord
-    if (discordClient)
-        discordClient.disconnect();
+  // Leave discord
+  if (discordClient)
+    discordClient.disconnect();
 
-    // Clear the stream check interval
-    if (streamInterval)
-        clearInterval(streamInterval);
+  // Clear the stream check interval
+  if (streamInterval)
+    clearInterval(streamInterval);
 
-    // Clear all the timeouts
-    timeouts.forEach(function(t) {
-        clearTimeout(t);
-    });
+  // Clear all the timeouts
+  timeouts.forEach(function(t) {
+    clearTimeout(t);
+  });
 
-    exited = true;
+  exited = true;
 }
 
 /**
@@ -130,234 +131,227 @@ function exit() {
  */
 
 function onError(message) {
-    error(message, true);
+  error(message, true);
 }
 
 function onDiscordReady() {
-    discordReady = true;
+  discordReady = true;
 }
 
 function onRegistered() {
-    log('Initialized...', true);
+  log('Initialized...', true);
 
-    // Send the Capabilities command
-    // https://help.twitch.tv/customer/portal/articles/1302780-twitch-irc
-    ircClient.send('CAP', 'REQ', constants.TWTTCH_MEMBERSHIP);
+  // Send the Capabilities command
+  // https://help.twitch.tv/customer/portal/articles/1302780-twitch-irc
+  ircClient.send('CAP', 'REQ', constants.TWTTCH_MEMBERSHIP);
 
-    // Join the channel
-    ircClient.join(config.channel);
+  // Join the channel
+  ircClient.join(config.channel);
 }
 
 function onJoin(name) {
-    log('join: ' + name);
+  log('join: ' + name);
 
-    // Say the join message
-    if (name === config.name) {
-        say(config.joinMessage);
+  // Say the join message
+  if (name === config.name) {
+    say(config.joinMessage);
 
-        // Init the timers
-        config.timers.forEach(function(timer, i) {
-            timeouts[i] = helpers.createTimeout(timer, i, onTimer);
-        });
-    }
+    // Init the timers
+    config.timers.forEach(function(timer, i) {
+      timeouts[i] = helpers.createTimeout(timer, i, onTimer);
+    });
+  }
 
-    // Index user with defaults
-    users[name] = users[name] || helpers.createUser();
+  // Index user with defaults
+  users[name] = users[name] || helpers.createUser();
 }
 
 function onPart(name) {
-    log('part: ' + name);
+  log('part: ' + name);
 
-    // If we have exited, disconnect
-    if (name === config.name && exited) {
-        say(config.partMessage);
+  // If we have exited, disconnect
+  if (name === config.name && exited) {
+    say(config.partMessage);
 
-        ircClient.disconnect();
-    }
+    ircClient.disconnect();
+  }
 
-    // Remove user from index
-    users[name] = undefined;
+  // Remove user from index
+  users[name] = undefined;
 }
 
 function onMotd(motd) {
-    log('\nMOTD:\n' + motd);
+  log('\nMOTD:\n' + motd);
 }
 
 function onNotice(name, to, text, message) {
-    log('notice: ' + name + ' ' + to + ' ' + text + ' ' + message);
+  log('notice: ' + name + ' ' + to + ' ' + text + ' ' + message);
 }
 
-function onDiscordMessage(user, userID, channelID, message) {
-  onMessage(user, message, channelID);
+function onDiscordMessage(user, userId, channelId, message) {
+  onMessage(user, message, channelId);
 }
 
-function onMessage(from, message, channelID) {
-    log('message: ' + from + ' => ' + message + ' => ' + channelID);
+function onMessage(from, message, channelId) {
+  log('message: ' + from + ' => ' + message + ' => ' + channelId);
 
-    // Log the message
-    logChat(from, message);
+  // Log the message
+  logChat(from, message);
 
-    // Ignore if spam
-    if (isSpam(from, message))
-        return;
+  // Ignore if spam
+  if (isSpam(from, message))
+    return;
 
-    // Check for command prefix
-    if (message.indexOf(config.commandPrefix) === 0)
-        onCommand(from, message, channelID);
+  // Check for command prefix
+  if (message.indexOf(config.commandPrefix) === 0)
+    onCommand(from, message, channelId);
 }
 
-function onCommand(from, message, channelID) {
-    // Strip the command prefix from the message
-    message = message.substr(config.commandPrefix.length).toLowerCase();
+function onCommand(from, message, channelId) {
+  // Strip the command prefix from the message
+  message = message.substr(config.commandPrefix.length).toLowerCase();
 
-    // Get mod status
-    var mod = users[from] && users[from].mod;
+  // Get mod status
+  var mod = users[from] && users[from].mod;
 
-    // Split up the message into command and arguments array
-    var parts   = message.split(' ');
-    var command = parts[0];
-    var args    = parts.slice(1);
+  // Split up the message into command and arguments array
+  var parts   = message.split(' ');
+  var command = parts[0];
+  var args    = parts.slice(1);
 
-    // Check last command usage time
-    var then = lastCommandUse[message]
-    var now  = moment().unix();
-    var diff = now - then;
-    if (!mod && !isNaN(diff) && diff <= 10)
-        return;
+  // Check last command usage time
+  var then = lastCommandUse[message]
+  var now  = moment().unix();
+  var diff = now - then;
+  if (!mod && !isNaN(diff) && diff <= 10)
+    return;
 
-    // If it's a valid command
-    if (config.commands[command]) {
-        var handler = config.commands[command];
+  // If it's a valid command
+  if (config.commands[command]) {
+    var handler = config.commands[command];
 
-        // If it's a function, run it
-        if (typeof handler === 'function') {
-            // Call the handler and convert to promise
-            var response = handler(args, mod);
-            response = Promise.resolve(response);
-            response.then(function(message) {
-                say(message, channelID);
-            });
-        }
-        // If it's a string, just say it
-        else if (typeof handler === 'string')
-            say(handler, channelID);
+    // If it's a function, run it
+    if (typeof handler === 'function') {
+      // Call the handler and convert to promise
+      var response = handler(args, mod);
+      response = Promise.resolve(response);
+      response.then(function(message) {
+        say(message, channelId);
+      });
     }
-    // Available commands
-    else if (command === 'cmd') {
-        var commands = Object.keys(config.commands);
+    // If it's a string, just say it
+    else if (typeof handler === 'string')
+      say(handler, channelId);
+  }
+  // Available commands
+  else if (command === 'cmd') {
+    var commands = Object.keys(config.commands);
 
-        // If commands exist
-        if (commands.length)
-            say('Available Commands: ' + config.commandPrefix + commands.join(', ' + config.commandPrefix), channelID);
-    }
-    else if (command === 'ping')
-        say('pong', channelID);
+    // If commands exist
+    if (commands.length)
+      say('Available Commands: ' + config.commandPrefix + commands.join(', ' + config.commandPrefix), channelId);
+  }
+  else if (command === 'ping')
+    say('pong', channelId);
 
-    // Update last command usage time
-    lastCommandUse[message] = now;
+  // Update last command usage time
+  lastCommandUse[message] = now;
 }
 
 function onRaw(message) {
-    // Ignore commands that we already get in other ways
-    if (!constants.IGNORE_COMMANDS[message.command])
-        log(message);
+  // Ignore commands that we already get in other ways
+  if (!constants.IGNORE_COMMANDS[message.command])
+    log(message);
 
-    // If MODE command, trigger mode event
-    if (message.command === 'MODE')
-        onMode(message.args[0], message.nick, message.args[1], message.args[2]);
+  // If MODE command, trigger mode event
+  if (message.command === 'MODE')
+    onMode(message.args[0], message.nick, message.args[1], message.args[2]);
 }
 
 function onMode(channel, by, mode, argument, message) {
-    log('mode: ' + channel + ' ' + by + ' ' + mode + ' ' + argument + ' ' + message);
+  log('mode: ' + channel + ' ' + by + ' ' + mode + ' ' + argument + ' ' + message);
 
-    // If it's for this channel and sent from Twitch
-    if (channel === config.channel && by === constants.TWITCH_NAME) {
-        // Add mod
-        if (mode === constants.MODES.ADD_MOD) {
-            users[argument] = users[argument] || helpers.createUser();
-            users[argument].mod = true;
-        }
-        // Subtract mod
-        else if (mode === constants.MODES.SUB_MOD && users[argument])
-            users[argument].mod = false;
+  // If it's for this channel and sent from Twitch
+  if (channel === config.channel && by === constants.TWITCH_NAME) {
+    // Add mod
+    if (mode === constants.MODES.ADD_MOD) {
+      users[argument] = users[argument] || helpers.createUser();
+      users[argument].mod = true;
     }
+    // Subtract mod
+    else if (mode === constants.MODES.SUB_MOD && users[argument])
+      users[argument].mod = false;
+  }
 }
 
 function onTimer(timer, i) {
-    // If function, run it
-    if (typeof timer.handler === 'function') {
-        // Call the handler and convert to promise
-        var response = timer.handler();
-        response = Promise.resolve(response);
-        response.then(function(message) {
-            say(message);
+  // If function, run it
+  if (typeof timer.handler === 'function') {
+    // Call the handler and convert to promise
+    var response = timer.handler();
+    response = Promise.resolve(response);
+    response.then(function(message) {
+      say(message);
 
-            // Start a new timeout
-            timeouts[i] = helpers.createTimeout(timer, i, onTimer);
-        });
+      // Start a new timeout
+      timeouts[i] = helpers.createTimeout(timer, i, onTimer);
+    });
 
-        return;
-    }
-    // If string, just say it
-    else if (typeof timer.handler === 'string')
-        say(timer.handler);
+    return;
+  }
+  // If string, just say it
+  else if (typeof timer.handler === 'string')
+    say(timer.handler);
 
-    timeouts[i] = helpers.createTimeout(timer, i, onTimer);
+  timeouts[i] = helpers.createTimeout(timer, i, onTimer);
 }
 
 function onCheckStream() {
-    // See if stream is live
-    // https://dev.twitch.tv/docs/api/v3/streams#get-streamschannel
-    var url  = constants.TWITCH_API_URI + 'streams/' + config.channel.replace('#', '');
-    var opts = {
-        json: true,
-        headers: {
-            'Client-ID': constants.TWITCH_CLIENT_ID
-        }
-    };
+  // See if stream is live
+  // https://dev.twitch.tv/docs/api/v3/streams#get-streamschannel
+  var url  = constants.TWITCH_API_URI + 'streams/' + config.channel.replace('#', '');
+  var opts = {
+    json: true,
+    headers: {
+      'Client-ID': constants.TWITCH_CLIENT_ID
+    }
+  };
 
-    request.get(url, opts, function(err, res) {
-        var data = (res || {}).body || {};
+  request.get(url, opts, function(err, res) {
+    var data = (res || {}).body || {};
 
-        if (data.stream) {
-            log('stream: live');
+    if (data.stream) {
+      log('stream: live');
 
-            // If the stream was offline before
-            if (streamLive === false)
-                onDiscordAnnounce(data.stream);
+      // If the stream was offline before, announce it
+      if (streamLive === false && discordReady) {
+        var message = stream.channel.display_name + ' is streaming ' +
+          stream.game + ' - ' + stream.channel.status + ' @ ' +
+          stream.channel.url;
 
-            streamLive = true;
-        }
-        else if (data.stream === null) {
-            log('stream: offline');
+        // Send an announcement to all the discord channels
+        config.discordChannels.forEach(function(id) {
+          sendDiscordMessage(id, message);
+        });
+      }
 
-            var now = moment().unix();
-            if (streamLive)
-                streamOfflineAt = now
-            else {
-                var timeLimit = now - (60 * 30); // 30 minutes ago
-                if (streamOfflineAt <= timeLimit && config.autoExit)
-                    exit();
-            }
+      streamLive = true;
+    }
+    else if (data.stream === null) {
+      log('stream: offline');
 
-            streamLive = false;
-        }
-    });
-}
+      var now = moment().unix();
+      if (streamLive)
+        streamOfflineAt = now
+      else {
+        var timeLimit = now - (60 * 30); // 30 minutes ago
+        if (streamOfflineAt <= timeLimit && config.autoExit)
+          exit();
+      }
 
-function onDiscordAnnounce(stream) {
-    if (!discordReady)
-        return;
-
-    // Create the message
-    var message = stream.channel.display_name + ' is streaming ' +
-        stream.game + ' - ' + stream.channel.status + ' @ ' +
-        stream.channel.url;
-
-    // Send an announcement to all the discord channels
-    config.discordChannels.forEach(function(id) {
-        sendDiscordMessage(id, message);
-    });
+      streamLive = false;
+    }
+  });
 }
 
 // Helper functions
@@ -371,21 +365,21 @@ function onDiscordAnnounce(stream) {
  * @returns {boolean} - true if spam, false if not
  */
 function isSpam(from, message) {
-    if (!config.filterSpam)
-        return false;
-
-    // Skip if this is a mod
-    if (users[from] && users[from].mod)
-        return false;
-
-    // Check for capital letter spam
-    var uppercaseCount = message.replace(/[^A-Z]/g, '').length;
-    if (uppercaseCount >= 10 && uppercaseCount >= message.length / 2) {
-        timeoutUser(from, null, 'stop using capital letters');
-        return true;
-    }
-
+  if (!config.filterSpam)
     return false;
+
+  // Skip if this is a mod
+  if (users[from] && users[from].mod)
+    return false;
+
+  // Check for capital letter spam
+  var uppercaseCount = message.replace(/[^A-Z]/g, '').length;
+  if (uppercaseCount >= 10 && uppercaseCount >= message.length / 2) {
+    timeoutUser(from, null, 'stop using capital letters');
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -396,10 +390,10 @@ function isSpam(from, message) {
  * @param args    {string} - arguments for the command
  */
 function twitchCommand(command, args) {
-    if (!ircClient || typeof command !== 'string')
-        return;
+  if (!ircClient || typeof command !== 'string')
+    return;
 
-    ircClient.send('PRIVMSG', config.channel, '/' + command + ' ' + (args || ''));
+  ircClient.send('PRIVMSG', config.channel, '/' + command + ' ' + (args || ''));
 }
 
 /**
@@ -410,21 +404,18 @@ function twitchCommand(command, args) {
  * @param reason  {string}      - the reason for the timeout
  */
 function timeoutUser(name, seconds, reason) {
-    name   = name   || '';
-    reason = reason || '';
+  // Create a user if it doesn't exist
+  users[name] = users[name] || helpers.createUser();
+  users[name].offenses++;
 
-    // Create a user if it doesn't exist
-    users[name] = users[name] || helpers.createUser();
-    users[name].offenses++;
+  var offenses = users[name].offenses;
 
-    var offenses = users[name].offenses;
-
-    if (offenses > config.maxOffenses)
-        banUser(name);
-    else {
-        seconds = seconds || offenses === 1 ? 10 : 60;
-        twitchCommand('timeout', name + ' ' + seconds + ' ' + reason + ' - warning ' + offenses + ' of ' + config.maxOffenses);
-    }
+  if (offenses > config.maxOffenses)
+    banUser(name);
+  else {
+    seconds = seconds || (offenses === 1 ? 10 : 60);
+    twitchCommand('timeout', name + ' ' + seconds + ' ' + reason + ' - warning ' + offenses + ' of ' + config.maxOffenses);
+  }
 }
 
 /**
@@ -433,27 +424,27 @@ function timeoutUser(name, seconds, reason) {
  * @param name {string} - nickname of the user to ban
  */
 function banUser(name) {
-    twitchCommand('ban', name + ' too many chat offenses');
+  twitchCommand('ban', name + ' too many chat offenses');
 }
 
 /**
  * Say a message to chat
  *
  * @param message     {string} - send a message to chat
- * @param [channelID] {string} - id of discord channel
+ * @param [channelId] {string} - id of discord channel
  */
-function say(message, channelID) {
-    channelID = channelID || false;
+function say(message, channelId) {
+  channelId = channelId || false;
 
-    if (channelID) {
-        sendDiscordMessage(channelID, message);
-        return;
-    }
+  if (channelId) {
+    sendDiscordMessage(channelId, message);
+    return;
+  }
 
-    if (!ircClient || typeof message !== 'string')
-        return;
+  if (!ircClient || typeof message !== 'string')
+    return;
 
-    ircClient.say(config.channel, message);
+  ircClient.say(config.channel, message);
 }
 
 /**
@@ -463,13 +454,13 @@ function say(message, channelID) {
  * @param message {string} - message to send to channel
  */
 function sendDiscordMessage(id, message) {
-    if (!discordClient || typeof id !== 'string' || typeof message !== 'string')
-        return;
+  if (!discordClient || typeof id !== 'string' || typeof message !== 'string')
+    return;
 
-    discordClient.sendMessage({
-        to:      id,
-        message: message
-    });
+  discordClient.sendMessage({
+    to:      id,
+    message: message,
+  });
 }
 
 /**
@@ -479,23 +470,23 @@ function sendDiscordMessage(id, message) {
  * @param message {string} - the message sent
  */
 function logChat(from, message) {
-    if (typeof config.log !== 'string' || !from || typeof message !== 'string')
-        return;
+  if (typeof config.log !== 'string' || !from || typeof message !== 'string')
+    return;
 
-    // Get the current moment
-    var now  = moment();
+  // Get the current moment
+  var now = moment();
 
-    // Create the file name
-    var file = path.join(config.log, now.format('YYYY-MM-DD') + '-' + 'chat.log');
+  // Create the file name
+  var file = path.join(config.log, now.format('YYYY-MM-DD') + '-' + 'chat.log');
 
-    // Create the text to log based on moment and chat info
-    var text = '[' + now.format('YYYY-MM-DD hh:mm A') + '] ' + from + ': ' + message + '\n';
+  // Create the text to log based on moment and chat info
+  var text = '[' + now.format('YYYY-MM-DD hh:mm A') + '] ' + from + ': ' + message + '\n';
 
-    // Append the text to the log file
-    fs.appendFile(file, text, function(err) {
-        if (err)
-            error(err);
-    });
+  // Append the text to the log file
+  fs.appendFile(file, text, function(err) {
+    if (err)
+      error(err);
+  });
 }
 
 /**
@@ -505,8 +496,8 @@ function logChat(from, message) {
  * @param [force] {boolean} - set to `true` to force log even if not debug
  */
 function log(message, force) {
-    if (config.debug || force)
-        console.log(message);
+  if (config.debug || force)
+    console.log(message);
 }
 
 /**
@@ -516,6 +507,6 @@ function log(message, force) {
  * @param [force] {boolean} - set to `true` to force log even if not debug
  */
 function error(message, force) {
-    if (config.debug || force)
-        console.log('Error:', message);
+  if (config.debug || force)
+    console.log('Error:', message);
 }
