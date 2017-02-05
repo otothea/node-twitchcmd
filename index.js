@@ -82,8 +82,10 @@ function init(_config) {
     });
 
     // Add listeners
-    discordClient.on('ready',   onDiscordReady);
-    discordClient.on('message', onDiscordMessage);
+    discordClient.on('ready',      onDiscordReady);
+    discordClient.on('message',    onDiscordMessage);
+    discordClient.on('disconnect', onDiscordDisconnect);
+    discordClient.on('error',      onError);
   }
 
   // If we are logging, create the directory if not exists
@@ -199,7 +201,11 @@ function onMotd(motd) {
 }
 
 function onNotice(name, to, text, message) {
-  log('notice: ' + name + ' ' + to + ' ' + text + ' ' + message);
+  log('notice: ' + name + ' ' + to + ' ' + text);
+
+  if (message.args && message.args[1] === 'Login authentication failed') {
+    throw new Error('Twitch Authentication Failed');
+  }
 }
 
 function onDiscordMessage(user, userId, channelId, message) {
@@ -226,7 +232,7 @@ function onCommand(from, message, channelId) {
   message = message.substr(config.commandPrefix.length).toLowerCase();
 
   // Get mod status
-  var mod = users[from] && users[from].mod;
+  var isMod = users[from] && users[from].mod;
 
   // Split up the message into command and arguments array
   var parts   = message.split(' ');
@@ -237,25 +243,34 @@ function onCommand(from, message, channelId) {
   var then = lastCommandUse[message]
   var now  = moment().unix();
   var diff = now - then;
-  if (!mod && !isNaN(diff) && diff <= 10)
+  if (!isMod && !isNaN(diff) && diff <= 10)
     return;
 
   // If it's a valid command
   if (config.commands[command]) {
-    var handler = config.commands[command];
+    var mod = config.commands[command].mod;
 
-    // If it's a function, run it
-    if (typeof handler === 'function') {
-      // Call the handler and convert to promise
-      var response = handler(args, mod);
-      response = Promise.resolve(response);
-      response.then(function(message) {
-        say(message, channelId);
-      });
+    // Validate mod status
+    if (mod && !isMod)
+      return;
+
+    // Get the command handler
+    var handler = config.commands[command].handler;
+
+    switch (typeof handler) {
+      // If it's a function, run it
+      case 'function':
+        // Call the handler and convert to promise
+        var response = handler(args);
+        Promise.resolve(response).then(function(message) {
+          say(message, channelId);
+        });
+        break;
+      // If it's a string, just say it
+      case 'string':
+        say(handler, channelId);
+        break;
     }
-    // If it's a string, just say it
-    else if (typeof handler === 'string')
-      say(handler, channelId);
   }
   // Available commands
   else if (command === 'cmd') {
@@ -283,7 +298,7 @@ function onRaw(message) {
 }
 
 function onMode(channel, by, mode, argument, message) {
-  log('mode: ' + channel + ' ' + by + ' ' + mode + ' ' + argument + ' ' + message);
+  log('mode: ' + channel + ' ' + by + ' ' + mode + ' ' + argument);
 
   // If it's for this channel and sent from Twitch
   if (channel === config.twitch.channel && by === constants.TWITCH_NAME) {
@@ -366,6 +381,10 @@ function onCheckStream() {
       streamLive = false;
     }
   });
+}
+
+function onDiscordDisconnect(err) {
+  throw new Error('Discord ' + err);
 }
 
 // Helper functions

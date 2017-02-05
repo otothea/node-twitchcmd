@@ -2,7 +2,10 @@ var request   = require('request');
 var twitchcmd = require('twitchcmd');
 
 var commands = {
-  giphy: giphy
+  giphy: {
+    mod:     true,
+    handler: giphy,
+  }
 };
 
 var timers = [{
@@ -14,14 +17,14 @@ var timers = [{
 
 var config = {
   twitch: {
-    name:     'examplebot',
-    password: 'oauth:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-    channel:  '#example',
+    name:       'examplebot',
+    password:   'oauth:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    channel:    '#example',
+    filterSpam:  true,
   },
   joinMessage: 'hi',
   partMessage: 'bye',
   debug:       true,
-  filterSpam:  true,
   commands:    commands,
   timers:      timers
 };
@@ -34,9 +37,7 @@ process.on('SIGINT', () => {
 
 // Handlers
 
-function giphy(args, mod) {
-  if (!mod) return; // restrict this command to moderators only
-
+function giphy(args) {
   var opts = {
     json: true,
     qs: {
@@ -54,5 +55,5 @@ function giphy(args, mod) {
       else
         resolve();
     });
-  }).catch(console.error);
+  });
 }

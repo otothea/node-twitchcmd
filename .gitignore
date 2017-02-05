@@ -1,7 +1,5 @@
 node_modules/
-config.js
 .idea
 *.log
-otothebot/
 commandModules/
 .DS_Store
