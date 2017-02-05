@@ -26,7 +26,7 @@ $ npm install --save twitchcmd
 
 ## Usage
 
-```
+```javascript
 var twitchcmd = require('twitchcmd');
 
 var config = {
@@ -42,7 +42,13 @@ var config = {
   joinMessage: 'Hello world!',
   partMessage: 'Goodbye world!',
   commands: {
-    test: 'It works!'
+    test: {
+      handler: 'It works!'
+    },
+    testmod: {
+      mod: true,
+      handler: 'It works! But only for mods!'
+    }
   },
   timers: [{
     seconds: 300,
@@ -85,9 +91,11 @@ Map commands to your bot using the `commands` option in your `config`. Commands 
 
 This command map will respond to the command `!test` with `It works!`:
 
-```
+```javascript
 commands: {
-  test: 'It works!'
+  test: {
+    handler: 'It works!'
+  }
 }
 ```
 
@@ -107,29 +115,30 @@ _**Arguments**_
 - **args** {string[]} - Array of arguments from the chat command
 - **mod** {boolean} - Whether or not the sender is a moderator
 
-This command map will respond to the command `!giphy` with an image that matches the input args using [request](https://github.com/request/request):
+This command map will respond to the command `!giphy` with an image that matches the input args using [request](https://github.com/request/request), but will only work for moderators:
 
-```
+```javascript
 commands: {
-  giphy: function(args, mod) {
-    if (!mod) return; // restrict this command to moderators only
- 
-    var opts = {
-      json: true,
-      qs: {
-        q:       args.join(' '),
-        api_key: 'dc6zaTOxFJmzC'
-      }
-    };
- 
-    return new Promise(function(resolve, reject) {
-      request.get('http://api.giphy.com/v1/gifs/search', opts, function(err, res) {
-        if (err)
-          return reject(err);
+  giphy: {
+    mod: true,
+    handler: function(args) {
+      var opts = {
+        json: true,
+        qs: {
+          q:       args.join(' '),
+          api_key: 'dc6zaTOxFJmzC'
+        }
+      };
 
-        resolve(res.body.data[0].images.original.url);
-      });
-    }).catch(console.error);
+      return new Promise(function(resolve, reject) {
+        request.get('http://api.giphy.com/v1/gifs/search', opts, function(err, res) {
+          if (err)
+            return reject(err);
+
+          resolve(res.body.data[0].images.original.url);
+        });
+      }).catch(console.error);
+    }
   }
 }
 ```
@@ -161,7 +170,7 @@ Create messages that run on intervals using the `timers` option in your `config`
 
 **Example**
 
-```
+```javascript
 timers: [{
   seconds: 300,
   handler: 'Still here!'
