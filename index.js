@@ -354,6 +354,7 @@ function onCheckStream() {
 
       // If the stream was offline before, announce it
       if (streamLive === false && discordReady) {
+        var stream = data.stream;
         var message = stream.channel.display_name + ' is streaming ' +
           stream.game + ' - ' + stream.channel.status + ' @ ' +
           stream.channel.url;
